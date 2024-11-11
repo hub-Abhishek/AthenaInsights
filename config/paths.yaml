@@ -1,0 +1,5 @@
+data_folder: 'data'
+
+csv_folder: 'csv'
+parquet_folder: 'parquet'
+
