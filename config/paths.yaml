@@ -1,3 +1,6 @@
+s3_bucket: 'sisyphus-general-bucket'
+folder_name: 'AthenaInsights'
+
 data_folder: 'data'
 
 csv_folder: 'csv'

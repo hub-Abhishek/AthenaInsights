@@ -2,3 +2,5 @@
 *.parquet
 *.zip
 */secrets.yaml
+*.ipynb_checkpoints*
+*__pycache__*
