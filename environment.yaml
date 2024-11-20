@@ -3,6 +3,7 @@ dependencies:
   - python==3.9.19
   - ipython
   - alpaca-py==0.31.0
+  - ipykernel
   - tqdm
   - s3fs
   - boto3
