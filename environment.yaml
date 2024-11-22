@@ -7,3 +7,6 @@ dependencies:
   - tqdm
   - s3fs
   - boto3
+  - pyarrow
+  - fastparquet
+  - matplotlib 
