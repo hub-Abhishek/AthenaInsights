@@ -9,3 +9,5 @@ python setup.py bdist_wheel
 pip uninstall misc -y
 
 pip install ..\src\scripts\lib\dist\misc-0.1.0-py3-none-any.whl --force-reinstall
+
+python -m ipykernel install --user --name fools_gold --display-name  fools_gold

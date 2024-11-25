@@ -11,4 +11,7 @@ dependencies:
   - fastparquet
   - matplotlib 
   - pyyaml
-  
+  - scikit-learn
+  - sagemaker
+  - libmamba
+  - protobuf==3.20.1

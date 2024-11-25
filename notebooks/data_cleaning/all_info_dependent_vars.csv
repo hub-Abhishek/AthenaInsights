@@ -1,0 +1,2 @@
+name,time_period,path,cols
+stock_bars_1min,1min,s3://sisyphus-general-bucket/AthenaInsights/latest_data/dependent_variable/stock_bars_1min.parquet,"['open', 'high', 'low', 'close', 'close_sma_5m', 'category', 'future_highs', 'future_lows', 'slopes']"
