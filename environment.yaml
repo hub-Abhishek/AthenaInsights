@@ -10,3 +10,5 @@ dependencies:
   - pyarrow
   - fastparquet
   - matplotlib 
+  - pyyaml
+  
