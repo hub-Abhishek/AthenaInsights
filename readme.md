@@ -3,6 +3,10 @@ conda env create -f environment.yaml
 
 conda activate fools_gold
 
+conda install -n base conda-libmamba-solver
+
+conda config --set solver libmamba
+
 cd .\src\scripts/lib
 python setup.py bdist_wheel
 

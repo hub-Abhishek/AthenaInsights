@@ -12,3 +12,6 @@ dependencies:
   - matplotlib 
   - pyyaml
   - scikit-learn
+  - xgboost
+  - openpyxl
+  - xlsxwriter
