@@ -1,0 +1,10 @@
+data_ingestion:
+    alpaca_download:
+        refresh: True
+        start_date: '2024-11-18'
+        end_date: 'today'
+        window: '3week'
+        symbols: [
+        'SPY', 'QQQ', 'VIXM', 'DJIA', 'DAX',
+        # 'IXIC', 'RUT', 'UKX', 'NTETF', 'HSXUF', 'CAC 40', 'GBP'
+        ]

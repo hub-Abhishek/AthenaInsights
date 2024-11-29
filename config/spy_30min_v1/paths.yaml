@@ -1,7 +1,7 @@
 s3_bucket: 'sisyphus-general-bucket'
-folder_name: 'AthenaInsights'
+base_folder: 'AthenaInsights'
 
-data_folder: 'data'
+data_folder: 'latest_data'
 
 csv_folder: 'csv'
 parquet_folder: 'parquet'
