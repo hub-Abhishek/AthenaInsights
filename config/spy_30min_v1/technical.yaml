@@ -1,10 +1,35 @@
+common: 
+    symbols: [
+        'SPY', 'QQQ', 'VIXM', 'DJIA', 'DAX',
+        # 'IXIC', 'RUT', 'UKX', 'NTETF', 'HSXUF', 'CAC 40', 'GBP'
+        ]
+
 data_ingestion:
     alpaca_download:
         refresh: True
         start_date: '2024-11-18'
         end_date: 'today'
         window: '3week'
-        symbols: [
-        'SPY', 'QQQ', 'VIXM', 'DJIA', 'DAX',
-        # 'IXIC', 'RUT', 'UKX', 'NTETF', 'HSXUF', 'CAC 40', 'GBP'
-        ]
+        
+data_prep:
+    durations:
+        minute_level: ['2min', '3min', '5min', '10min', '15min', '20min', '25min', '30min']
+        hour_level: ['120min', '180min', '240min']
+        day_level: ['2D', '3D', '5D', '10D', '15D', '20D', '30D', '50D', '100D', '150D', '200D']
+
+feature_prep:
+    features_to_be_calculated: ['autocorrelation_removal_v1', 'moving_averages']
+    symbols: ['SPY']
+    stage_order:
+        autocorrelation_removal_v1: 'moving_averages'
+        moving_averages: 'rsi'
+    calc_metrics:
+        autocorrelation_removal_v1: 'None'
+        moving_averages: 
+            minutes:
+                window_lt_30: [2, 3, 5, 8, 12, 10, 20, 26]
+                window_gt_30: [5, 8, 10, 12, 20, 26, 50, 100, 200]
+            days:
+                window_lt_100: [2, 3, 5, 8, 10, 12, 15, 20, 26, 50, 100, 200]
+                window_gt_100: [5, 8, 10, 12, 20, 26, 50]
+            

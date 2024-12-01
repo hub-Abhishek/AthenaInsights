@@ -2,6 +2,7 @@ README.md
 setup.py
 misc/__init__.py
 misc/constants.py
+misc/features_calc.py
 misc/utils.py
 misc.egg-info/PKG-INFO
 misc.egg-info/SOURCES.txt

@@ -88,11 +88,48 @@ def read_and_duplicate(path):
         df.to_parquet(path.replace('.parquet', '_backup.parquet'))
         return df
 
+def read_df(path):
+    if path.endswith('.parquet'):
+        log(f'reading from {path}')
+        df = pd.read_parquet(path)
+        return df
+
+    if path.endswith('.csv'):
+        log(f'reading from {path}')
+        df = pd.read_csv(path)
+        return df
+
 def save_df_as_parquet(df, path, index=True):
     try:
         log(f"writing to file {path}")
-        df.to_parquet(path)
+        df.to_parquet(path, index=index)
     except:
         log(f"ERROR WITH {path}! NOT ABLE TO SAVE FILE! REPLACING WITH BACKUP")
         df = pd.read_parquet(path.replace('.parquet', '_backup.parquet'),)
         df.to_parquet(path.replace('_backup.parquet', '.parquet'), index=index)
+
+def save_df_as_csv(df, path, index=True):
+    try:
+        log(f"writing to file {path}")
+        df.to_csv(path, index=index)
+    except:
+        log(f"ERROR WITH {path}! NOT ABLE TO SAVE FILE! REPLACING WITH BACKUP")
+        df = pd.read_csv(path.replace('.csv', '_backup.csv'),)
+        df.to_parquet(path.replace('_backup.csv', '.csv'), index=index)
+
+def explore_loc(client, bucket, loc):
+    return client.list_objects_v2(
+            Bucket=bucket,
+            Prefix=loc)
+    
+def get_all_paths_from_loc(client, bucket, loc):
+    paths = []
+    response = explore_loc(client, bucket, loc)
+    for content in response.get('Contents', []):
+        paths.append(f"s3://{bucket}/{content['Key']}")
+    return paths
+
+def get_name_and_type(path):
+    name = path.split('/')[-1].split('.')[0]
+    df_type = path.split('/')[-1].split('.')[1]
+    return name, df_type
