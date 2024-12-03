@@ -7,5 +7,5 @@ csv_folder: 'csv'
 parquet_folder: 'parquet'
 data_prep_folder: 'data_prep'
 reduced_autocorelation_folder: 'reduced_autocorelation'
-feature_prep_folder: 'feature_prep_folder'
+feature_prep_folder: 'feature_prep'
 

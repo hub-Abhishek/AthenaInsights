@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import yaml
 import datetime
@@ -132,6 +133,24 @@ def get_all_paths_from_loc(client, bucket, loc, filters=None):
     return paths
 
 def get_name_and_type(path):
-    name = path.split('/')[-1].split('.')[0]
-    df_type = path.split('/')[-1].split('.')[1]
-    return name, df_type
+    file_name = path.split('/')[-1]
+    
+    df_type = file_name.split('/')[-1].split('.')[1]
+    name = file_name.split('.')[0]
+    if len(name.split('_'))>=5:
+        features_type = name.split('_')[-1]
+        base_or_diff = name.split('_')[-2]
+        duration = name.split('_')[-3]
+        duration, duration_unit = re.match(r'^(\d+)([a-zA-Z]+)$', duration).groups()
+        duration = int(duration)
+        return name, df_type, features_type, base_or_diff, duration, duration_unit
+    else:
+        features_type = None
+        base_or_diff = None
+        duration = name.split('_')[-1]
+        log(name)
+        log(duration)
+        duration, duration_unit = re.match(r'^(\d+)([a-zA-Z]+)$', duration).groups()
+        duration = int(duration)
+        return name, df_type, features_type, base_or_diff, duration, duration_unit
+        

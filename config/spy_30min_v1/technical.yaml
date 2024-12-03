@@ -1,4 +1,5 @@
 common: 
+    model_name: 'spy_30min_v1'
     symbols: [
         'SPY', 'QQQ', 'VIXM', 'DJIA', 'DAX',
         # 'IXIC', 'RUT', 'UKX', 'NTETF', 'HSXUF', 'CAC 40', 'GBP'
@@ -18,18 +19,33 @@ data_prep:
         day_level: ['2D', '3D', '5D', '10D', '15D', '20D', '30D', '50D', '100D', '150D', '200D']
 
 feature_prep:
-    features_to_be_calculated: ['autocorrelation_removal_v1', 'moving_averages']
+    features_to_be_calculated: ['autocorrelation_removal_v1', 'avg', 'rsi', 'macd', 'other_features']
     symbols: ['SPY']
-    stage_order:
-        autocorrelation_removal_v1: 'moving_averages'
-        moving_averages: 'rsi'
     calc_metrics:
         autocorrelation_removal_v1: 'None'
-        moving_averages: 
+        avg:
             minutes:
                 window_lt_30: [2, 3, 5, 8, 12, 10, 20, 26]
                 window_gt_30: [5, 8, 10, 12, 20, 26, 50, 100, 200]
             days:
                 window_lt_100: [2, 3, 5, 8, 10, 12, 15, 20, 26, 50, 100, 200]
                 window_gt_100: [5, 8, 10, 12, 20, 26, 50]
+        rsi:
+            minutes:
+                window_lt_10: [[7, 9, 11, 14, 17, 21], ['close', 'close_ema_2m', 'close_sma_2m']]
+                window_lt_30: [[7, 9, 11, 14, 17, 21], ['close', 'close_ema_2m', 'close_sma_2m', 'close_ema_3m', 'close_sma_3m', 'close_ema_5m', 'close_sma_5m']]
+                window_lt_60: [[7, 9, 11, 14, 17, 21], ['close', 'close_ema_5m', 'close_sma_5m', 'close_ema_10m', 'close_sma_10m', 'close_ema_20m', 'close_sma_20m', 'close_ema_50m', 'close_sma_50m']]
+                window_gt_60: [[7, 9, 11, 14, 17, 21], ['close', 'close_ema_5m', 'close_sma_5m', 'close_ema_10m', 'close_sma_10m', 'close_ema_20m', 'close_sma_20m']]
+            days:
+                window_lt_100: [[5, 7, 9, 11, 14, 17, 21], ['close', 'close_ema_5m', 'close_sma_5m', 'close_ema_10m', 'close_sma_10m', 'close_ema_20m', 'close_sma_20m', 'close_ema_50m', 'close_sma_50m']]
+                window_gt_100: [[5, 7, 9, 11, 14, 17, 21], ['close', 'close_ema_5m', 'close_sma_5m', 'close_ema_10m', 'close_sma_10m', 'close_ema_20m', 'close_sma_20m', 'close_ema_50m', 'close_sma_50m']]
+        macd:
+            minutes:
+                window_lt_10: [11, 13, 17, 20, 26]
+                window_lt_30: [11, 13, 17, 20, 26]
+                window_gt_30: [11, 13, 17, 20, 26, 30, 50]
+            days:
+                window_lt_100: [11, 13, 17, 20, 26]
+                window_gt_100: [11, 13, 17, 20, 26, 30, 50]
+        other_features:
             
