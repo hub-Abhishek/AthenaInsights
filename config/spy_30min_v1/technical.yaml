@@ -64,7 +64,7 @@ feature_prep:
 model:
     model_selection: xgboost
     
-training_file:
+modeling:
     category_map:
         A: 0
         B: 1

@@ -97,10 +97,10 @@ class ModelTrainingFilePrep(BaseClass):
         save_df_as_parquet(base_df, f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/model/data/{name}.parquet')
         update_config(base_df, f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/model/data/{name}.parquet', store_loc='training_files')
         
-        cols, path = get_paths_and_cols(self.features_listing_config, dur='1min', file='stock_bars_1min', store_loc='dependent_variable', )
+        cols, path = get_paths_and_cols_from_config(self.features_listing_config, dur='1min', file='stock_bars_1min_base_avg', store_loc='dependent_variable', )
         dependent_df = read_df(path, [x for x in cols if x not in base_df.columns])
         log(f'dependent_df.shape - {dependent_df.shape}')
-        log(f'dependent_df.columns - {dependent_df.columns}')
+        # log(f'dependent_df.columns - {dependent_df.columns}')
         base_df = pd.concat([base_df, dependent_df], axis=1)
         log(f'base_df.shape - {base_df.shape}')
         del dependent_df

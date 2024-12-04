@@ -14,6 +14,8 @@ from misc import utils
 from misc.utils import BaseClass, get_alpaca_secrets, load_config, log, read_and_duplicate, read_df, save_df_as_parquet, save_df_as_csv, get_all_paths_from_loc, get_name_and_type
 from misc.features_calc import update_config, load_features_config, get_paths_and_cols_from_config, check_index_is_monotonic_increasing
 # from misc.features_calc import 
+import pickle
+from io import BytesIO
 
 import os
 import re
@@ -27,9 +29,6 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 warnings.filterwarnings("ignore")
-
-
-
 
 
 class ModelTraining(BaseClass):
@@ -50,7 +49,16 @@ class ModelTraining(BaseClass):
         self.data_prep_folder = self.paths_config["data_prep_folder"]
         self.reduced_autocorelation_folder = self.paths_config["reduced_autocorelation_folder"]
         self.feature_prep_folder = self.paths_config["feature_prep_folder"]
+        
+        self.model_base_folder = self.paths_config["model_base_folder"]
+        self.model_data_folder = self.paths_config["model_data_folder"]
+        self.model_results_folder = self.paths_config["model_results_folder"]
+        self.model_results_images_subfolder = self.paths_config["model_results_images_subfolder"]
+        self.model_results_texts_subfolder = self.paths_config["model_results_texts_subfolder"]
+        
         self.client = boto3.client('s3')
+        self.s3_resource = boto3.resource('s3')
+        self.bucket_resource = self.s3_resource.Bucket(self.paths_config["s3_bucket"])
 
         self.common_config = self.config['technical_yaml']['common']
         self.feature_prep = self.config['technical_yaml']['feature_prep']
@@ -59,6 +67,10 @@ class ModelTraining(BaseClass):
         self.features_to_be_calculated = self.feature_prep['features_to_be_calculated']
         self.symbols = self.feature_prep['symbols']
         self.calc_metrics = self.feature_prep['calc_metrics']
+        
+        self.model_name = self.common_config['model_name']
+        self.model_base_path = f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/{self.paths_config["model_base_folder"]}'
+        self.model_results_path = f'{self.model_base_path}/{self.model_results_folder}/{self.model_name}'
         
         self.features_listing_config = load_features_config()
         
@@ -71,16 +83,19 @@ class ModelTraining(BaseClass):
                                 num_class=3,
                                 eval_metric=['merror','mlogloss'])
         
-        df = read_df('s3://sisyphus-general-bucket/AthenaInsights/latest_data/model/data/stock_bars_1min_diff.parquet' )
+        df = read_df('s3://sisyphus-general-bucket/AthenaInsights/latest_data/model/data/stock_bars_1min_base_avg_base_rsi_base_macd_base_otherfeatures_base_avg.parquet' )
         
-        df = df.fillna(0)
+        
         category_map = self.modeling_config['category_map']
         reverse_category_map = {v: k for k, v in category_map.items()}
         df['mapped_category'] = df['category'].map({'A': 0, 'B': 1, 'C':2})
         df['mapped_category'].value_counts()
+        df = df.drop(columns=['symbol', 'symbol1', 'category'])
+        df = pd.concat([df.drop(columns='direction'), pd.get_dummies(df['direction'], drop_first=True)], axis=1)
+        df = df.fillna(0)
         
         start_date = self.modeling_config['start_date']
-        end_date = self.modeling_config['send_date']
+        end_date = self.modeling_config['end_date']
         date_series = pd.date_range(start=start_date, end=end_date, freq='D')
         date_series = [z.strftime('%Y-%m-%d') for z in date_series]
         
@@ -92,28 +107,32 @@ class ModelTraining(BaseClass):
             'df': df,
             'model': model,
             'date_series': date_series,
+            'category_map': category_map,
+            'reverse_category_map': reverse_category_map
         }
 
     @staticmethod
     def get_dates(dt):
         test_date = dt
-        next_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-        next_10_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + timedelta(days=9)).strftime('%Y-%m-%d')
-        prev_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + timedelta(days=-1)).strftime('%Y-%m-%d')
+        next_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        next_10_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + datetime.timedelta(days=9)).strftime('%Y-%m-%d')
+        prev_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
         return test_date, next_day, next_10_day, prev_day
     
     @staticmethod
     def get_train_test_split(df, test_date, next_day, next_10_day, prev_day ):
-        X_train = df.loc[:prev_day, ].drop(columns=['category', 'mapped_category'])
+
+        df = df.drop(columns=df.select_dtypes(include='object').columns)
+        X_train = df.loc[:prev_day, ].drop(columns=['mapped_category'])
         y_train = df.loc[:prev_day, 'mapped_category']
 
-        X_test_only_next_day = df.loc[test_date, ].drop(columns=['category', 'mapped_category'])
+        X_test_only_next_day = df.loc[test_date, ].drop(columns=['mapped_category'])
         y_test_only_next_day = df.loc[test_date, 'mapped_category']
 
-        X_test_next_10_days = df.loc[test_date: next_10_day, ].drop(columns=['category', 'mapped_category'])
+        X_test_next_10_days = df.loc[test_date: next_10_day, ].drop(columns=['mapped_category'])
         y_test_next_10_days = df.loc[test_date: next_10_day, 'mapped_category']
 
-        X_test_full = df.loc[test_date:, ].drop(columns=['category', 'mapped_category'])
+        X_test_full = df.loc[test_date:, ].drop(columns=['mapped_category'])
         y_test_full = df.loc[test_date:, 'mapped_category']
 
         return X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full
@@ -121,6 +140,7 @@ class ModelTraining(BaseClass):
     @staticmethod
     def initialte_and_train(model, X_train, y_train, X_test_only_next_day, y_test_only_next_day, 
                             X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full):
+
         model.fit(X_train,
                 y_train,
                 verbose=0,
@@ -128,44 +148,148 @@ class ModelTraining(BaseClass):
 
         return model
     
+    def save_model(self, model, models_subfolder):
+        s3 = boto3.client('s3')
+        bucket_name = self.paths_config["s3_bucket"]
+        model_path = f'{models_subfolder}/my_model.model'
+        model_path = model_path.replace(f'{self.bucket_loc}/', '')
+        log(f'model_path - {model_path}')
+
+        buffer = BytesIO()
+        pickle.dump(model, buffer)
+        buffer.seek(0)
+        s3.upload_fileobj(buffer, bucket_name, model_path)
+        
+#         import boto3
+#         from io import BytesIO
+#         import pickle
+
+#         # Initialize a boto3 client
+#         s3 = boto3.client('s3')
+#         bucket_name = 'your-bucket-name'
+#         model_path = 'models/my_model.pkl'
+
+#         # Download the object from S3 to a buffer
+#         buffer = BytesIO()
+#         s3.download_fileobj(bucket_name, model_path, buffer)
+#         buffer.seek(0)
+
+#         # Load the model from the buffer using pickle
+#         loaded_bst = pickle.load(buffer)
+#         print('Model loaded successfully')
+
+    def save_image(self, img_data, name):
+        name = name.replace(f'{self.bucket_loc}/', '')
+        log(f'saving image to - {name}')
+        img_data = BytesIO()
+        plt.savefig(img_data, format='png')
+        img_data.seek(0)
+        self.bucket_resource.put_object(Body=img_data, ContentType='image/png', Key=name)
+        
+    def save_smaller_reports(self, report, name):
+        name = name.replace(f'{self.bucket_loc}/', '')
+        log(f'report path - {name}')
+        s3 = boto3.client('s3')
+        bucket_name = self.paths_config["s3_bucket"]
+        
+        buffer = BytesIO()
+        pickle.dump(report, buffer)
+        buffer.seek(0)
+        s3.upload_fileobj(buffer, bucket_name, name)
+
+#         import boto3
+#         from io import BytesIO
+#         import pickle
+
+#         # Initialize a boto3 client
+#         s3 = boto3.client('s3')
+#         bucket_name = 'your-bucket-name'
+#         accuracy_path = 'accuracy/accuracy_score.pkl'
+
+#         # Download the object from S3 to a buffer
+#         buffer = BytesIO()
+#         s3.download_fileobj(bucket_name, accuracy_path, buffer)
+#         buffer.seek(0)
+
+#         # Load the accuracy score from the buffer using pickle
+#         loaded_accuracy = pickle.load(buffer)
+#         print(f'Loaded Accuracy Score: {loaded_accuracy}')
+
+    def save_train_plots(self, clf, dt, images_subfolder):
+        results = clf.evals_result()
+        epochs = len(results['validation_0']['mlogloss'])
+        x_axis = range(0, epochs)
+
+        # xgboost 'mlogloss' plot
+        fig, ax = plt.subplots(figsize=(9,5))
+        ax.plot(x_axis, results['validation_0']['mlogloss'], label='Train')
+        ax.plot(x_axis, results['validation_1']['mlogloss'], label='Test')
+        ax.plot(x_axis, results['validation_2']['mlogloss'], label='Test_full')
+        ax.plot(x_axis, results['validation_3']['mlogloss'], label='Test_only_next_day')
+        ax.legend()
+        plt.ylabel('mlogloss')
+        plt.title(f'GridSearchCV XGBoost mlogloss - {dt}')
+        self.save_image(plt, f'{images_subfolder}/GridSearchCV XGBoost mlogloss - {dt}.png')
+        # fig.savefig(f'{self.images_directory}/XGBoost mlogloss - {dt}.png')
+
+        # xgboost 'merror' plot
+        fig, ax = plt.subplots(figsize=(9,5))
+        ax.plot(x_axis, results['validation_0']['merror'], label='Train')
+        ax.plot(x_axis, results['validation_1']['merror'], label='Test')
+        ax.plot(x_axis, results['validation_2']['merror'], label='Test_full')
+        ax.plot(x_axis, results['validation_3']['merror'], label='Test_only_next_day')
+        ax.legend()
+        plt.ylabel('merror')
+        plt.title(f'GridSearchCV XGBoost merror - {dt}')
+        # plt.show()
+        # fig.savefig(f'{images_directory}/XGBoost merror - {dt}.png')
+        self.save_image(plt, f'{images_subfolder}/XGBoost merror - {dt}.png')
+
     def train(self, dfs):
         df = dfs['df']
         model = dfs['model']
-        date_series = ['date_series']
-        
+        date_series = dfs['date_series']
+
+        log(f"reverse_category_map - {dfs['reverse_category_map']}")
+
         for dt in tqdm(date_series):
-            # print(f"running for dt = {dt}", dt)
             log(f"running for dt = {dt}")
+
+            models_subfolder = f"{self.model_results_path}/{dt}"
+            images_subfolder = f"{models_subfolder}/{self.model_results_images_subfolder}"
+            texts_subfolder = f"{models_subfolder}/{self.model_results_texts_subfolder}"
+
             test_date, next_day, next_10_day, prev_day = self.get_dates(dt)
             log(f"test_date: {test_date}, next_day: {next_day}, next_10_day: {next_10_day}, prev_day: {prev_day}")
 
-            X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full = get_train_test_split(df, test_date, next_day, next_10_day, prev_day)
+            X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full = self.get_train_test_split(df, test_date, next_day, next_10_day, prev_day)
             if y_test_full.empty:
                 break
 
-            log(f"y_train.value_counts():{y_train.value_counts()}")
-            log(f"y_test_only_next_day.value_counts():\n{y_test_only_next_day.value_counts()}")
-            log(f"y_test_next_10_days.value_counts():\n{y_test_next_10_days.value_counts()}")
-            log(f"y_test_full.value_counts():\n{y_test_full.value_counts()}")
+            # log(f"y_train.value_counts():{y_train.value_counts()}")
+            # log(f"y_test_only_next_day.value_counts():\n{y_test_only_next_day.value_counts()}")
+            # log(f"y_test_next_10_days.value_counts():\n{y_test_next_10_days.value_counts()}")
+            # log(f"y_test_full.value_counts():\n{y_test_full.value_counts()}")
 
             log("training the model")
-            clf = initialte_and_train(mocdl, X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full)
+            clf = self. initialte_and_train(model, X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full)
+            self.save_model(clf, models_subfolder)
             log(f"model trained for {dt}")
 
             log("results")
-            get_results(clf, dt)
+            self.save_train_plots(clf, dt, images_subfolder)
 
             if not X_test_only_next_day.empty:
                 log("1 day test")
-                generate_reports(X_test_only_next_day, y_test_only_next_day, clf, dur='1_day', dt)
+                self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', dt, texts_subfolder)
 
             if not X_test_next_10_days.empty:
                 log("10 day test")
-                generate_reports(X_test_next_10_days, y_test_next_10_days, clf, dur='10_day', dt)
+                self.generate_reports(X_test_next_10_days, y_test_next_10_days, clf, '10_day', dt, texts_subfolder)
 
             if not X_test_full.empty:
                 log("full test")
-                generate_reports(X_test_full, y_test_full, clf, next_day=True, dur='full_day', dt)
+                self.generate_reports(X_test_full, y_test_full, clf, '10_day', dt, texts_subfolder)
 
             feature_important = clf.feature_importances_ 
             keys = list(X_train.columns)
@@ -173,221 +297,160 @@ class ModelTraining(BaseClass):
 
             log("feature importances")
             fea_imp = pd.DataFrame(data=values, index=keys, columns=["score"]).sort_values(by = "score", ascending=True)
-            log(fea_imp, dt)
+            log(fea_imp)
 
-            if not X_test_only_next_day.empty:
-                preds_probs = clf.predict_proba(X_test_only_next_day)
-                preds_probs1 = (preds_probs >= 0.5).argmax(axis=1,)
-                plot_categorization(df, dt, pd.Series(preds_probs1).map(reverse_category_map))
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-    def save(self, dfs):
-        results_loc = 'results'
-        model_folder = 'model_2_diff_prices_without_rsi'
-        directory = f"{results_loc}/{model_folder}"
-        images_directory = f"{directory}/images"
+            # if not X_test_only_next_day.empty:
+            #     preds_probs = clf.predict_proba(X_test_only_next_day)
+            #     preds_probs1 = (preds_probs >= 0.5).argmax(axis=1,)
+            #     plot_categorization(df, dt, pd.Series(preds_probs1).map(reverse_category_map))
 
-        if not os.path.exists(directory):
-            os.mkdir(directory)
+    def generate_reports(self, x, y, clf, dur, dt, texts_subfolder):
+        y_p = clf.predict(x)
+        y_proba = clf.predict_proba(x)
+        
+        confusion_matrix_rep = pd.DataFrame(confusion_matrix(y, y_p))
+        save_df_as_csv(confusion_matrix_rep, f'{texts_subfolder}/confusion_matrix_rep_{dur}.csv')
 
-        if not os.path.exists(images_directory):
-            os.mkdir(images_directory)
+        accuracy_score_rep = accuracy_score(y, y_p)
+        self.save_smaller_reports(accuracy_score_rep, name=f'{texts_subfolder}/accuracy_score_rep.pkl')
+        
+        balanced_accuracy_score_rep = balanced_accuracy_score(y, y_p)
+        self.save_smaller_reports(balanced_accuracy_score_rep, name=f'{texts_subfolder}/balanced_accuracy_score_rep.pkl')
+        
+        micro_precision_score_rep = precision_score(y, y_p, average='micro')
+        self.save_smaller_reports(micro_precision_score_rep, name=f'{texts_subfolder}/micro_precision_score_rep.pkl')
+        
+        micro_recall_score_rep = recall_score(y, y_p, average='micro')
+        self.save_smaller_reports(micro_recall_score_rep, name=f'{texts_subfolder}/micro_recall_score_rep.pkl')
+        
+        micro_f1_score_rep = f1_score(y, y_p, average='micro')
+        self.save_smaller_reports(micro_f1_score_rep, name=f'{texts_subfolder}/micro_f1_score_rep.pkl')
+        
+        macro_precision_score_rep = precision_score(y, y_p, average='macro')
+        self.save_smaller_reports(macro_precision_score_rep, name=f'{texts_subfolder}/macro_precision_score_rep.pkl')
+        
+        macro_recall_score_rep = recall_score(y, y_p, average='macro')
+        self.save_smaller_reports(macro_recall_score_rep, name=f'{texts_subfolder}/macro_recall_score_rep.pkl')
+        
+        macro_f1_score_rep = f1_score(y, y_p, average='macro')
+        self.save_smaller_reports(macro_f1_score_rep, name=f'{texts_subfolder}/macro_f1_score_rep.pkl')
+        
+        weighted_precision_score_rep = precision_score(y, y_p, average='weighted')
+        self.save_smaller_reports(weighted_precision_score_rep, name=f'{texts_subfolder}/weighted_precision_score_rep.pkl')
+        
+        weighted_recall_score_rep = recall_score(y, y_p, average='weighted')
+        self.save_smaller_reports(weighted_recall_score_rep, name=f'{texts_subfolder}/weighted_recall_score_rep.pkl')
+        
+        weighted_f1_score_rep = f1_score(y, y_p, average='weighted')
+        self.save_smaller_reports(weighted_f1_score_rep, name=f'{texts_subfolder}/weighted_f1_score_rep.pkl')
+        
+        classification_report_rep = pd.DataFrame(classification_report(y, y_p, output_dict=True))
+        save_df_as_csv(classification_report_rep, f'{texts_subfolder}/classification_report_{dur}.csv')
 
-        file_name = 'results_0.xlsx'
-        file_name = f"{directory}/results_0.xlsx"
-
-        # if os.path.exists(file_name):
-        #     file_name, result_num = file_name.split(".")[0].split("_")
-        #     result_num += 1
-        #     file_name = file_name + result_num + ".xlsx"
-        #     print(f'base name: {file_name}')
-
-
-        data = {'features used': list(df.columns)}
-        data = pd.DataFrame(data)
-
-        sheet_name = 'InitialSheet'
-
-        # Write the DataFrame to an Excel file with a custom sheet name
-        with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
-            data.to_excel(writer, sheet_name=sheet_name, index=False)
+        log('\n-------------------- Key Metrics --------------------')
+        log('\nAccuracy: {:.2f}'.format(accuracy_score_rep))
+        log('Balanced Accuracy: {:.2f}\n'.format(balanced_accuracy_score_rep))
+        log('Micro Precision: {:.2f}'.format(micro_precision_score_rep))
+        log('Micro Recall: {:.2f}'.format(micro_recall_score_rep))
+        log('Micro F1-score: {:.2f}\n'.format(micro_f1_score_rep))
+        log('Macro Precision: {:.2f}'.format(macro_precision_score_rep))
+        log('Macro Recall: {:.2f}'.format(macro_recall_score_rep))
+        log('Macro F1-score: {:.2f}\n'.format(macro_f1_score_rep))
+        log('Weighted Precision: {:.2f}'.format(weighted_precision_score_rep))
+        log('Weighted Recall: {:.2f}'.format(weighted_recall_score_rep))
+        log('Weighted F1-score: {:.2f}'.format(weighted_f1_score_rep))
+        log('\n--------------- Classification Report ---------------\n')
+        log(classification_report_rep)
     
-
+    def run(self, ):
+        dfs = self.extract()
+        self.train(dfs)
+        
+if __name__ == '__main__':
+    config = load_config()
+    model_training = ModelTraining(config)
+    model_training.run()
         
         
         
         
-        
-        
 
 
 
 
-def log(x, dt, image=None, add=None):
-    if type(x)==type('str') or type(x).__name__=='DataFrame':
-        if type(x)==type('str'):
-            data = {'text': [x]}
-            data = pd.DataFrame(data)
-        else:
-            data = x
+# def log(x, dt, image=None, add=None):
+#     if type(x)==type('str') or type(x).__name__=='DataFrame':
+#         if type(x)==type('str'):
+#             data = {'text': [x]}
+#             data = pd.DataFrame(data)
+#         else:
+#             data = x
 
-        book = openpyxl.load_workbook(file_name)
-        if dt in book.sheetnames:
-            sheet = book[dt]
-            start_row = sheet.max_row + 1  # Find the first empty row
+#         book = openpyxl.load_workbook(file_name)
+#         if dt in book.sheetnames:
+#             sheet = book[dt]
+#             start_row = sheet.max_row + 1  # Find the first empty row
             
-        else:
-            sheet = book.create_sheet(dt)  # Create a new sheet
-            start_row = 1
+#         else:
+#             sheet = book.create_sheet(dt)  # Create a new sheet
+#             start_row = 1
 
-         # Convert DataFrame to rows and append to the sheet
-        for r_idx, row in enumerate(dataframe_to_rows(data, index=False, header=False), start=start_row):
-            for c_idx, value in enumerate(row, start=1):
-                sheet.cell(row=r_idx, column=c_idx, value=value)
+#          # Convert DataFrame to rows and append to the sheet
+#         for r_idx, row in enumerate(dataframe_to_rows(data, index=False, header=False), start=start_row):
+#             for c_idx, value in enumerate(row, start=1):
+#                 sheet.cell(row=r_idx, column=c_idx, value=value)
 
-        book.save(file_name)
+#         book.save(file_name)
 
-    elif image==1:
-        book = openpyxl.load_workbook(file_name)
-        sheet = book[dt]
-        img = Image(add)
-        sheet.add_image(img)
-        book.save(file_name)
-    else:
-        raise ValueError('what are you trying to save?')
+#     elif image==1:
+#         book = openpyxl.load_workbook(file_name)
+#         sheet = book[dt]
+#         img = Image(add)
+#         sheet.add_image(img)
+#         book.save(file_name)
+#     else:
+#         raise ValueError('what are you trying to save?')
         
 
 
 
-def get_results(clf, dt):
-    results = clf.evals_result()
-    epochs = len(results['validation_0']['mlogloss'])
-    x_axis = range(0, epochs)
 
-    log(f"results: {results}", dt)
-    log(f"epochs: {epochs}", dt)
-    log("\n\n", dt)
-
-    # xgboost 'mlogloss' plot
-    fig, ax = plt.subplots(figsize=(9,5))
-    ax.plot(x_axis, results['validation_0']['mlogloss'], label='Train')
-    ax.plot(x_axis, results['validation_1']['mlogloss'], label='Test')
-    ax.plot(x_axis, results['validation_2']['mlogloss'], label='Test_full')
-    ax.plot(x_axis, results['validation_3']['mlogloss'], label='Test_only_next_day')
-    ax.legend()
-    plt.ylabel('mlogloss')
-    plt.title(f'GridSearchCV XGBoost mlogloss - {dt}')
-    # plt.show()
-    fig.savefig(f'{images_directory}/GridSearchCV XGBoost mlogloss - {dt}.png')
-    # log(None, dt, image=1, add=f'results/images/GridSearchCV XGBoost mlogloss - {dt}.png')
-    log("\n\n", dt)
-
-    # xgboost 'merror' plot
-    fig, ax = plt.subplots(figsize=(9,5))
-    ax.plot(x_axis, results['validation_0']['merror'], label='Train')
-    ax.plot(x_axis, results['validation_1']['merror'], label='Test')
-    ax.plot(x_axis, results['validation_2']['merror'], label='Test_full')
-    ax.plot(x_axis, results['validation_3']['merror'], label='Test_only_next_day')
-    ax.legend()
-    plt.ylabel('merror')
-    plt.title(f'GridSearchCV XGBoost merror - {dt}')
-    # plt.show()
-    fig.savefig(f'{images_directory}/GridSearchCV XGBoost merror - {dt}.png')
-    # log(None, dt, image=1, add=f'results/images/GridSearchCV XGBoost merror - {dt}.png')
-    log("\n\n", dt)
     
     
-def generate_reports(x, y, clf, next_day=False):
-    log('## ---------- Model Classification Report ----------', dt)
-    log('## get predictions and create model quality report', dt)
 
-    y_p = clf.predict(x)
-
-    log('\n------------------ Confusion Matrix -----------------\n', dt)
-    log(pd.DataFrame(confusion_matrix(y, y_p)), dt)
-
-    if next_day:
-        preds_probs = clf.predict_proba(x)
-        for i in range(4, 10, 1):
-            log(f'threshold - {i/10}', dt)
-            preds_probs1 = (preds_probs>=i/10).argmax(axis=1,)
-            log(pd.DataFrame(confusion_matrix(y, preds_probs1)), dt)
-            log('\n\n', dt)
-
-    log('\n-------------------- Key Metrics --------------------', dt)
-    log('\nAccuracy: {:.2f}'.format(accuracy_score(y, y_p)), dt)
-    log('Balanced Accuracy: {:.2f}\n'.format(balanced_accuracy_score(y, y_p)), dt)
-
-    log('Micro Precision: {:.2f}'.format(precision_score(y, y_p, average='micro')), dt)
-    log('Micro Recall: {:.2f}'.format(recall_score(y, y_p, average='micro')), dt)
-    log('Micro F1-score: {:.2f}\n'.format(f1_score(y, y_p, average='micro')), dt)
-
-    log('Macro Precision: {:.2f}'.format(precision_score(y, y_p, average='macro')), dt)
-    log('Macro Recall: {:.2f}'.format(recall_score(y, y_p, average='macro')), dt)
-    log('Macro F1-score: {:.2f}\n'.format(f1_score(y, y_p, average='macro')), dt)
-
-    log('Weighted Precision: {:.2f}'.format(precision_score(y, y_p, average='weighted')), dt)
-    log('Weighted Recall: {:.2f}'.format(recall_score(y, y_p, average='weighted')), dt)
-    log('Weighted F1-score: {:.2f}'.format(f1_score(y, y_p, average='weighted')), dt)
-
-    log('\n--------------- Classification Report ---------------\n', dt)
-    log(classification_report(y, y_p), dt)
-    log('---------------------- XGBoost ----------------------', dt) # unnecessary fancy styling
     
-def plot_categorization(df, date, pred, field='close', ):
-    """ Plot categorization for a given day with dynamic field selection """
-    df_day = df.loc[date]
-    df_day['preds'] = list(pred)
+# def plot_categorization(df, date, pred, field='close', ):
+#     """ Plot categorization for a given day with dynamic field selection """
+#     df_day = df.loc[date]
+#     df_day['preds'] = list(pred)
 
-    plt.figure(figsize=(14, 7))
-    fig, axs = plt.subplots(2, 1, figsize=(14,14))
-    axs[0].plot(df_day.index, df_day[field], label=f'{field.capitalize()} Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[0].scatter(df_day[df_day['category'] == cat].index,
-                       df_day[df_day['category'] == cat][field],
-                       color=color, label=f'Category {cat}',
-                       s=30 if cat != 'C' else 0)
-    axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+#     plt.figure(figsize=(14, 7))
+#     fig, axs = plt.subplots(2, 1, figsize=(14,14))
+#     axs[0].plot(df_day.index, df_day[field], label=f'{field.capitalize()} Price', color='gray', linewidth=2)
+#     for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+#         axs[0].scatter(df_day[df_day['category'] == cat].index,
+#                        df_day[df_day['category'] == cat][field],
+#                        color=color, label=f'Category {cat}',
+#                        s=30 if cat != 'C' else 0)
+#     axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
+#     axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
+#     axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
 
-    axs[1].plot(df_day.index, df_day[field], label=f'{field.capitalize()} Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[1].scatter(df_day[df_day['preds'] == cat].index,
-                       df_day[df_day['preds'] == cat][field],
-                       color=color, label=f'Preds {cat}',
-                       s=20 if cat != 'C' else 0)
-    axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+#     axs[1].plot(df_day.index, df_day[field], label=f'{field.capitalize()} Price', color='gray', linewidth=2)
+#     for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+#         axs[1].scatter(df_day[df_day['preds'] == cat].index,
+#                        df_day[df_day['preds'] == cat][field],
+#                        color=color, label=f'Preds {cat}',
+#                        s=20 if cat != 'C' else 0)
+#     axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
+#     axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
+#     axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
 
-    plt.legend()
-    plt.title(f'Price Categorization on {date}')
-    plt.xlabel('Timestamp')
-    plt.ylabel(f'{field.capitalize()} Price')
-    # plt.show()
-    plt.savefig(f'{images_directory}/plot for day - {date}.png')
-    # log(None, dt, image=1, add=f'results/images/plot for day - {date}.png')
-    log("\n\n", date)
+#     plt.legend()
+#     plt.title(f'Price Categorization on {date}')
+#     plt.xlabel('Timestamp')
+#     plt.ylabel(f'{field.capitalize()} Price')
+#     # plt.show()
+#     plt.savefig(f'{images_directory}/plot for day - {date}.png')
+#     # log(None, dt, image=1, add=f'results/images/plot for day - {date}.png')
+#     log("\n\n", date)

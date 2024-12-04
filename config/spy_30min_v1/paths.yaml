@@ -11,3 +11,6 @@ feature_prep_folder: 'feature_prep'
 
 model_base_folder: 'model'
 model_data_folder: 'data'
+model_results_folder: 'results'
+model_results_images_subfolder: 'images'
+model_results_texts_subfolder: 'texts'
