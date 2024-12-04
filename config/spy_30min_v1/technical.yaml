@@ -19,7 +19,7 @@ data_prep:
         day_level: ['2D', '3D', '5D', '10D', '15D', '20D', '30D', '50D', '100D', '150D', '200D']
 
 feature_prep:
-    features_to_be_calculated: ['autocorrelation_removal_v1', 'avg', 'rsi', 'macd', 'other_features']
+    features_to_be_calculated: ['autocorrelation_removal_v1', 'avg', 'rsi', 'macd']
     symbols: ['SPY']
     calc_metrics:
         autocorrelation_removal_v1: 'None'
@@ -47,5 +47,27 @@ feature_prep:
             days:
                 window_lt_100: [11, 13, 17, 20, 26]
                 window_gt_100: [11, 13, 17, 20, 26, 30, 50]
-        other_features:
+    other_features:
+        base_df: ['stock_bars_1min_diff_avg', 'stock_bars_1min_diff_avg']
+        features_to_be_calculated: ['autocorrelation_removal_v1', 'avg', 'rsi', 'macd']
             
+    dependent_var:
+        based_on: 'close_sma_5m'
+        prev_data_points: 11
+        positive_slope_threshold: 0.013
+        negative_slope_threshold: -0.026 
+        positive_rise_threshold: 0.0007
+        negative_drop_threshold: 0.0012
+        positive_future_window: 30
+        negative_future_window: 30
+        
+model:
+    model_selection: xgboost
+    
+training_file:
+    category_map:
+        A: 0
+        B: 1
+        C: 2
+    start_date: '2024-11-01'
+    end_date: '2024-11-30'

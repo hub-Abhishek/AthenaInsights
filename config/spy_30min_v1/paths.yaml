@@ -9,3 +9,5 @@ data_prep_folder: 'data_prep'
 reduced_autocorelation_folder: 'reduced_autocorelation'
 feature_prep_folder: 'feature_prep'
 
+model_base_folder: 'model'
+model_data_folder: 'data'

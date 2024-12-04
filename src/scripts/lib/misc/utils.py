@@ -6,6 +6,7 @@ import datetime
 
 import pandas as pd
 import numpy as np
+import pyarrow.parquet as pq
 
 from abc import ABC
 
@@ -84,15 +85,16 @@ def log(s):
 
 def read_and_duplicate(path):
     if path.endswith('.parquet'):
-        log(f'reading from {path}')
-        df = pd.read_parquet(path)
+        # log(f'reading from {path}')
+        df = read_df(path)
         df.to_parquet(path.replace('.parquet', '_backup.parquet'))
         return df
 
-def read_df(path):
+def read_df(path, columns=None):
     if path.endswith('.parquet'):
         log(f'reading from {path}')
-        df = pd.read_parquet(path)
+        # df = pd.read_parquet(path)
+        df = pq.read_pandas(path, columns=columns).to_pandas()
         return df
 
     if path.endswith('.csv'):
