@@ -1,6 +1,7 @@
 import streamlit as st
 import yaml
 from misc.utils import load_config
+from misc.frontend_utils import import_results
 
 # st.logo(st.image("resources/icon.webp"))
 st.set_page_config(
@@ -9,3 +10,5 @@ st.set_page_config(
     layout="wide",)
 
 config = load_config()
+
+
