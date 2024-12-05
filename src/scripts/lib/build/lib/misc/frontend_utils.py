@@ -1,7 +1,9 @@
 import boto3
 import os
 from PIL import Image
-from misc.utils import read_df, load_config
+import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
+from misc.utils import read_df, load_config, log
 
 def download_dir(prefix, local, bucket_name, client):
     paginator = client.get_paginator('list_objects_v2')
@@ -12,6 +14,7 @@ def download_dir(prefix, local, bucket_name, client):
             local_file_dir = os.path.dirname(local_file_path)
             if not os.path.exists(local_file_dir):
                 os.makedirs(local_file_dir)
+            log(f'downloading {file_path} to {local_file_path}')
             client.download_file(bucket_name, file_path, local_file_path)
 
 def list_subfolders(bucket_name, prefix, client):
@@ -31,7 +34,7 @@ def refresh_target():
     path = 's3://sisyphus-general-bucket/AthenaInsights/latest_data/dependent_variable/stock_bars_1min_base_avg.parquet'
     df = read_df(path)
     df.to_parquet('results/model_data/dependent_var.parquet')
-    print('downloaded dependent_var data')
+    log('downloaded dependent_var data')
 
 def refresh_model_results_data():
 
@@ -48,7 +51,7 @@ def refresh_model_results_data():
     with open(results_file_path, 'w') as file:
         for folder_name in sorted(subfolder_names):
             file.write(f"{folder_name}\n")
-    print('Written models to file')
+    log('Written models to file')
 
     local_directory = 'results/model_data/'
     download_dir(prefix, local_directory, bucket_name, s3)
@@ -79,3 +82,34 @@ def display_images_in_rows(images_generated_during_training, images_per_row, st,
             image = Image.open(image_path)
             with columns[idx]:
                 st.image(image, caption=image_file, use_column_width=True)
+
+# Plot categorization results
+def plot_categorization(df, date_selected, st):
+    """Plot categorization for a given day with dynamic field selection."""
+    plt.figure(figsize=(14, 7))
+    fig, axs = plt.subplots(2, 1, figsize=(14, 14))
+    axs[0].plot(df.us_eastern_timestamp, df['close'], label=f'Close Price', color='gray', linewidth=2)
+    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+        axs[0].scatter(df[df['category'] == cat].us_eastern_timestamp,
+                       df[df['category'] == cat].close,
+                       color=color, label=f'Category {cat}',
+                       s=30 if cat != 'C' else 0)
+    axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
+    axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
+    axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+
+    axs[1].plot(df.us_eastern_timestamp, df['close'], label=f'Close Price', color='gray', linewidth=2)
+    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+        axs[1].scatter(df[df['category'] == cat].us_eastern_timestamp,
+                       df[df['category'] == cat].close,
+                       color=color, label=f'Preds {cat}',
+                       s=20 if cat != 'C' else 0)
+    axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
+    axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
+    axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+
+    plt.legend()
+    plt.title(f'Price Categorization on {date_selected}')
+    plt.xlabel('Timestamp')
+    plt.ylabel(f'Close Price')
+    st.pyplot(plt)
