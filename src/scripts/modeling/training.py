@@ -1,33 +1,22 @@
-import xgboost as xgb
-import pandas as pd
+import os
+import re
+import boto3
+import pickle
+import warnings
+import datetime
 import numpy as np
-import openpyxl
+import pandas as pd
+from tqdm import tqdm
+import xgboost as xgb
+from io import BytesIO
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
-from openpyxl import load_workbook
-import xlsxwriter
-from openpyxl.drawing.image import Image
-from openpyxl.utils.dataframe import dataframe_to_rows
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from sklearn.metrics import confusion_matrix, accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score, classification_report
 
 from misc import utils
 from misc.utils import BaseClass, get_alpaca_secrets, load_config, log, read_and_duplicate, read_df, save_df_as_parquet, save_df_as_csv, get_all_paths_from_loc, get_name_and_type
 from misc.features_calc import update_config, load_features_config, get_paths_and_cols_from_config, check_index_is_monotonic_increasing
 # from misc.features_calc import 
-import pickle
-from io import BytesIO
-
-import os
-import re
-import boto3
-import warnings
-import datetime
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
-from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 warnings.filterwarnings("ignore")
 
 
@@ -49,13 +38,13 @@ class ModelTraining(BaseClass):
         self.data_prep_folder = self.paths_config["data_prep_folder"]
         self.reduced_autocorelation_folder = self.paths_config["reduced_autocorelation_folder"]
         self.feature_prep_folder = self.paths_config["feature_prep_folder"]
-        
+
         self.model_base_folder = self.paths_config["model_base_folder"]
         self.model_data_folder = self.paths_config["model_data_folder"]
         self.model_results_folder = self.paths_config["model_results_folder"]
         self.model_results_images_subfolder = self.paths_config["model_results_images_subfolder"]
         self.model_results_texts_subfolder = self.paths_config["model_results_texts_subfolder"]
-        
+
         self.client = boto3.client('s3')
         self.s3_resource = boto3.resource('s3')
         self.bucket_resource = self.s3_resource.Bucket(self.paths_config["s3_bucket"])
@@ -67,25 +56,25 @@ class ModelTraining(BaseClass):
         self.features_to_be_calculated = self.feature_prep['features_to_be_calculated']
         self.symbols = self.feature_prep['symbols']
         self.calc_metrics = self.feature_prep['calc_metrics']
-        
+
         self.model_name = self.common_config['model_name']
         self.model_base_path = f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/{self.paths_config["model_base_folder"]}'
         self.model_results_path = f'{self.model_base_path}/{self.model_results_folder}/{self.model_name}'
-        
+
         self.features_listing_config = load_features_config()
-        
+
     def extract(self):
-        
+
         model = xgb.XGBClassifier(n_estimators=100,
                                 objective='multi:softmax',
                                 n_jobs =-1,
                                 random_state=420,
                                 num_class=3,
                                 eval_metric=['merror','mlogloss'])
-        
+
         df = read_df('s3://sisyphus-general-bucket/AthenaInsights/latest_data/model/data/stock_bars_1min_base_avg_base_rsi_base_macd_base_otherfeatures_base_avg.parquet' )
-        
-        
+
+
         category_map = self.modeling_config['category_map']
         reverse_category_map = {v: k for k, v in category_map.items()}
         df['mapped_category'] = df['category'].map({'A': 0, 'B': 1, 'C':2})
@@ -93,16 +82,16 @@ class ModelTraining(BaseClass):
         df = df.drop(columns=['symbol', 'symbol1', 'category'])
         df = pd.concat([df.drop(columns='direction'), pd.get_dummies(df['direction'], drop_first=True)], axis=1)
         df = df.fillna(0)
-        
+
         start_date = self.modeling_config['start_date']
         end_date = self.modeling_config['end_date']
         date_series = pd.date_range(start=start_date, end=end_date, freq='D')
         date_series = [z.strftime('%Y-%m-%d') for z in date_series]
-        
+
         log(f'start_date - {start_date}')
         log(f'end_date - {end_date}')
         log(f'dates - {date_series}')
-        
+
         return {
             'df': df,
             'model': model,
@@ -118,7 +107,7 @@ class ModelTraining(BaseClass):
         next_10_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + datetime.timedelta(days=9)).strftime('%Y-%m-%d')
         prev_day = (datetime.datetime.strptime(test_date, '%Y-%m-%d') + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
         return test_date, next_day, next_10_day, prev_day
-    
+
     @staticmethod
     def get_train_test_split(df, test_date, next_day, next_10_day, prev_day ):
 
@@ -136,7 +125,7 @@ class ModelTraining(BaseClass):
         y_test_full = df.loc[test_date:, 'mapped_category']
 
         return X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full
-    
+
     @staticmethod
     def initialte_and_train(model, X_train, y_train, X_test_only_next_day, y_test_only_next_day, 
                             X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full):
@@ -147,7 +136,7 @@ class ModelTraining(BaseClass):
                 eval_set=[(X_train, y_train), (X_test_only_next_day, y_test_only_next_day), (X_test_next_10_days, y_test_next_10_days), (X_test_full, y_test_full)])
 
         return model
-    
+
     def save_model(self, model, models_subfolder):
         s3 = boto3.client('s3')
         bucket_name = self.paths_config["s3_bucket"]
@@ -159,7 +148,7 @@ class ModelTraining(BaseClass):
         pickle.dump(model, buffer)
         buffer.seek(0)
         s3.upload_fileobj(buffer, bucket_name, model_path)
-        
+
 #         import boto3
 #         from io import BytesIO
 #         import pickle
@@ -185,13 +174,13 @@ class ModelTraining(BaseClass):
         plt.savefig(img_data, format='png')
         img_data.seek(0)
         self.bucket_resource.put_object(Body=img_data, ContentType='image/png', Key=name)
-        
+
     def save_smaller_reports(self, report, name):
         name = name.replace(f'{self.bucket_loc}/', '')
         log(f'report path - {name}')
         s3 = boto3.client('s3')
         bucket_name = self.paths_config["s3_bucket"]
-        
+
         buffer = BytesIO()
         pickle.dump(report, buffer)
         buffer.seek(0)
@@ -253,6 +242,7 @@ class ModelTraining(BaseClass):
         log(f"reverse_category_map - {dfs['reverse_category_map']}")
 
         for dt in tqdm(date_series):
+            continue
             log(f"running for dt = {dt}")
 
             models_subfolder = f"{self.model_results_path}/{dt}"
@@ -289,7 +279,7 @@ class ModelTraining(BaseClass):
 
             if not X_test_full.empty:
                 log("full test")
-                self.generate_reports(X_test_full, y_test_full, clf, '10_day', dt, texts_subfolder)
+                self.generate_reports(X_test_full, y_test_full, clf, 'full', dt, texts_subfolder, df)
 
             feature_important = clf.feature_importances_ 
             keys = list(X_train.columns)
@@ -297,53 +287,66 @@ class ModelTraining(BaseClass):
 
             log("feature importances")
             fea_imp = pd.DataFrame(data=values, index=keys, columns=["score"]).sort_values(by = "score", ascending=True)
-            log(fea_imp)
+            save_df_as_csv(fea_imp, f'{texts_subfolder}/feature_importances.csv')
+            
+        self.upload_config()
+        
+    def upload_config(self):
+        log(f'uploading config files to {self.model_results_path}/paths.yaml')
+        log(os.path.exists('config/spy_30min_v1/paths.yaml'))
+        self.client.upload_file('config/spy_30min_v1/paths.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/paths.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
+        self.client.upload_file('config/spy_30min_v1/features.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/features.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
+        self.client.upload_file('config/spy_30min_v1/technical.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/technical.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
+        
 
             # if not X_test_only_next_day.empty:
             #     preds_probs = clf.predict_proba(X_test_only_next_day)
             #     preds_probs1 = (preds_probs >= 0.5).argmax(axis=1,)
             #     plot_categorization(df, dt, pd.Series(preds_probs1).map(reverse_category_map))
 
-    def generate_reports(self, x, y, clf, dur, dt, texts_subfolder):
+    def generate_reports(self, x, y, clf, dur, dt, texts_subfolder, df=None):
         y_p = clf.predict(x)
-        y_proba = clf.predict_proba(x)
-        
+        if dur=='full':
+            y_proba = clf.predict_proba(x)
+            y_proba = pd.DataFrame(y_proba)
+            save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
+
         confusion_matrix_rep = pd.DataFrame(confusion_matrix(y, y_p))
         save_df_as_csv(confusion_matrix_rep, f'{texts_subfolder}/confusion_matrix_rep_{dur}.csv')
 
         accuracy_score_rep = accuracy_score(y, y_p)
-        self.save_smaller_reports(accuracy_score_rep, name=f'{texts_subfolder}/accuracy_score_rep.pkl')
-        
+        self.save_smaller_reports(accuracy_score_rep, name=f'{texts_subfolder}/accuracy_score_rep_{dur}.pkl')
+
         balanced_accuracy_score_rep = balanced_accuracy_score(y, y_p)
-        self.save_smaller_reports(balanced_accuracy_score_rep, name=f'{texts_subfolder}/balanced_accuracy_score_rep.pkl')
-        
+        self.save_smaller_reports(balanced_accuracy_score_rep, name=f'{texts_subfolder}/balanced_accuracy_score_rep_{dur}.pkl')
+
         micro_precision_score_rep = precision_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_precision_score_rep, name=f'{texts_subfolder}/micro_precision_score_rep.pkl')
-        
+        self.save_smaller_reports(micro_precision_score_rep, name=f'{texts_subfolder}/micro_precision_score_rep_{dur}.pkl')
+
         micro_recall_score_rep = recall_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_recall_score_rep, name=f'{texts_subfolder}/micro_recall_score_rep.pkl')
-        
+        self.save_smaller_reports(micro_recall_score_rep, name=f'{texts_subfolder}/micro_recall_score_rep_{dur}.pkl')
+
         micro_f1_score_rep = f1_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_f1_score_rep, name=f'{texts_subfolder}/micro_f1_score_rep.pkl')
-        
+        self.save_smaller_reports(micro_f1_score_rep, name=f'{texts_subfolder}/micro_f1_score_rep_{dur}.pkl')
+
         macro_precision_score_rep = precision_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_precision_score_rep, name=f'{texts_subfolder}/macro_precision_score_rep.pkl')
-        
+        self.save_smaller_reports(macro_precision_score_rep, name=f'{texts_subfolder}/macro_precision_score_rep_{dur}.pkl')
+
         macro_recall_score_rep = recall_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_recall_score_rep, name=f'{texts_subfolder}/macro_recall_score_rep.pkl')
-        
+        self.save_smaller_reports(macro_recall_score_rep, name=f'{texts_subfolder}/macro_recall_score_rep_{dur}.pkl')
+
         macro_f1_score_rep = f1_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_f1_score_rep, name=f'{texts_subfolder}/macro_f1_score_rep.pkl')
-        
+        self.save_smaller_reports(macro_f1_score_rep, name=f'{texts_subfolder}/macro_f1_score_rep_{dur}.pkl')
+
         weighted_precision_score_rep = precision_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_precision_score_rep, name=f'{texts_subfolder}/weighted_precision_score_rep.pkl')
-        
+        self.save_smaller_reports(weighted_precision_score_rep, name=f'{texts_subfolder}/weighted_precision_score_rep_{dur}.pkl')
+
         weighted_recall_score_rep = recall_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_recall_score_rep, name=f'{texts_subfolder}/weighted_recall_score_rep.pkl')
-        
+        self.save_smaller_reports(weighted_recall_score_rep, name=f'{texts_subfolder}/weighted_recall_score_rep_{dur}.pkl')
+
         weighted_f1_score_rep = f1_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_f1_score_rep, name=f'{texts_subfolder}/weighted_f1_score_rep.pkl')
-        
+        self.save_smaller_reports(weighted_f1_score_rep, name=f'{texts_subfolder}/weighted_f1_score_rep_{dur}.pkl')
+
         classification_report_rep = pd.DataFrame(classification_report(y, y_p, output_dict=True))
         save_df_as_csv(classification_report_rep, f'{texts_subfolder}/classification_report_{dur}.csv')
 
@@ -361,19 +364,16 @@ class ModelTraining(BaseClass):
         log('Weighted F1-score: {:.2f}'.format(weighted_f1_score_rep))
         log('\n--------------- Classification Report ---------------\n')
         log(classification_report_rep)
-    
+
     def run(self, ):
         dfs = self.extract()
         self.train(dfs)
-        
+
 if __name__ == '__main__':
     config = load_config()
     model_training = ModelTraining(config)
-    model_training.run()
-        
-        
-        
-        
+    # model_training.run()
+    model_training.upload_config()
 
 
 
@@ -410,15 +410,10 @@ if __name__ == '__main__':
 #         book.save(file_name)
 #     else:
 #         raise ValueError('what are you trying to save?')
-        
 
 
 
 
-    
-    
-
-    
 # def plot_categorization(df, date, pred, field='close', ):
 #     """ Plot categorization for a given day with dynamic field selection """
 #     df_day = df.loc[date]
