@@ -8,11 +8,14 @@ st.set_page_config(
     page_icon="resources/icon.webp",
     layout="wide",)
 
+st.title("Configuration Manager")
+
 # def save_config(config, section, data):
 #     config[section] = data
 #     with open('config.yaml', 'w') as file:
 #         yaml.safe_dump(config, file, default_flow_style=False)
 #     st.success(f"Changes to {section} saved!")
+
 
 config = load_config()
 
@@ -61,6 +64,3 @@ with tabs[5]:
     if st.button('Save Modeling Changes', key='modeling'):
         new_data = yaml.safe_load(edited_modeling)
         save_config(config, 'modeling', new_data)
-
-st.title("YAML Configuration Manager")
-st.info("Use the tabs to navigate between different configuration sections.")
