@@ -242,7 +242,6 @@ class ModelTraining(BaseClass):
         log(f"reverse_category_map - {dfs['reverse_category_map']}")
 
         for dt in tqdm(date_series):
-            continue
             log(f"running for dt = {dt}")
 
             models_subfolder = f"{self.model_results_path}/{dt}"
@@ -306,10 +305,11 @@ class ModelTraining(BaseClass):
 
     def generate_reports(self, x, y, clf, dur, dt, texts_subfolder, df=None):
         y_p = clf.predict(x)
-        if dur=='full':
-            y_proba = clf.predict_proba(x)
-            y_proba = pd.DataFrame(y_proba)
-            save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
+        
+        y_proba = clf.predict_proba(x)
+        y_proba = pd.DataFrame(y_proba)
+        y_proba['pred'] = y_p
+        save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
 
         confusion_matrix_rep = pd.DataFrame(confusion_matrix(y, y_p))
         save_df_as_csv(confusion_matrix_rep, f'{texts_subfolder}/confusion_matrix_rep_{dur}.csv')
@@ -372,8 +372,8 @@ class ModelTraining(BaseClass):
 if __name__ == '__main__':
     config = load_config()
     model_training = ModelTraining(config)
-    # model_training.run()
-    model_training.upload_config()
+    model_training.run()
+    # model_training.upload_config()
 
 
 
