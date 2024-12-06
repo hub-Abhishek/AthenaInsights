@@ -2,7 +2,7 @@ import streamlit as st
 import yaml
 from misc.utils import load_config
 
-# st.logo(st.image("resources/icon.webp"))
+# st.logo(st.image("resources/icon.webp"), size="small")
 st.set_page_config(
     page_title="Athena Insights",
     page_icon="resources/icon.webp",
