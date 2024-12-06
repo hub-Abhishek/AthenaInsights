@@ -113,3 +113,22 @@ def plot_categorization(df, date_selected, st):
     plt.xlabel('Timestamp')
     plt.ylabel(f'Close Price')
     st.pyplot(plt)
+
+def display_clasification_report(st, other_results_dir):
+    file_names = ['classification_report_1_day.csv', 'classification_report_10_day.csv', 'classification_report_full.csv']
+    columns = st.columns(len(file_names))
+    for column, file_name in zip(columns, file_names):
+        file_path = f'{other_results_dir}/{file_name}'
+        df = pd.read_csv(file_path).rename(columns={'Unnamed: 0': 'Metric', '0': 'A', '1': 'B', '2': 'C'})
+        with column:
+            st.write(file_name.replace('_', ' ').replace('.csv', ''))
+            st.write(df)
+def confusion_matrix_rep_1_day(st, other_results_dir):
+    file_names = ['confusion_matrix_rep_1_day.csv', 'confusion_matrix_rep_10_day.csv', 'confusion_matrix_rep_full.csv']
+    columns = st.columns(len(file_names))
+    for column, file_name in zip(columns, file_names):
+        file_path = f'{other_results_dir}/{file_name}'
+        df = pd.read_csv(file_path).rename(columns={'Unnamed: 0': 'Category', '0': 'A', '1': 'B', '2': 'C'})
+        with column:
+            st.write(file_name.replace('_', ' ').replace('rep', 'report').replace('.csv', ''))
+            st.write(df)
