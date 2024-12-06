@@ -84,24 +84,24 @@ def display_images_in_rows(images_generated_during_training, images_per_row, st,
                 st.image(image, caption=image_file, use_column_width=True)
 
 # Plot categorization results
-def plot_categorization(df, date_selected, st):
+def plot_categorization(df, date_selected, dependent_field_name, predicted_field_name, st):
     """Plot categorization for a given day with dynamic field selection."""
     plt.figure(figsize=(14, 7))
     fig, axs = plt.subplots(2, 1, figsize=(14, 14))
-    axs[0].plot(df.us_eastern_timestamp, df['close'], label=f'Close Price', color='gray', linewidth=2)
+    axs[0].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
     for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
         axs[0].scatter(df[df['category'] == cat].us_eastern_timestamp,
-                       df[df['category'] == cat].close,
+                       df[df['category'] == cat][dependent_field_name],
                        color=color, label=f'Category {cat}',
                        s=30 if cat != 'C' else 0)
     axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
     axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
     axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
 
-    axs[1].plot(df.us_eastern_timestamp, df['close'], label=f'Close Price', color='gray', linewidth=2)
+    axs[1].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
     for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[1].scatter(df[df['category'] == cat].us_eastern_timestamp,
-                       df[df['category'] == cat].close,
+        axs[1].scatter(df[df[predicted_field_name] == cat].us_eastern_timestamp,
+                       df[df[predicted_field_name] == cat][dependent_field_name],
                        color=color, label=f'Preds {cat}',
                        s=20 if cat != 'C' else 0)
     axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
@@ -113,3 +113,34 @@ def plot_categorization(df, date_selected, st):
     plt.xlabel('Timestamp')
     plt.ylabel(f'Close Price')
     st.pyplot(plt)
+
+def find_true_column(row):
+    for col in ['A', 'B', 'C']:
+        if row[col]:
+            return col
+    return 'C'
+
+def display_clasification_report(st, other_results_dir):
+    file_names = ['classification_report_1_day.csv', 'classification_report_10_day.csv', 'classification_report_full.csv']
+    columns = st.columns(len(file_names))
+    for column, file_name in zip(columns, file_names):
+        file_path = f'{other_results_dir}/{file_name}'
+        df = pd.read_csv(file_path).rename(columns={'Unnamed: 0': 'Metric', '0': 'A', '1': 'B', '2': 'C'})
+        with column:
+            st.write(file_name.replace('_', ' ').replace('.csv', ''))
+            st.write(df)
+
+def confusion_matrix_rep_1_day(st, other_results_dir):
+    file_names = ['confusion_matrix_rep_1_day.csv', 'confusion_matrix_rep_10_day.csv', 'confusion_matrix_rep_full.csv']
+    columns = st.columns(len(file_names))
+    for column, file_name in zip(columns, file_names):
+        file_path = f'{other_results_dir}/{file_name}'
+        df = pd.read_csv(file_path).rename(columns={'Unnamed: 0': 'Category', '0': 'A', '1': 'B', '2': 'C'})
+        with column:
+            st.write(file_name.replace('_', ' ').replace('rep', 'report').replace('.csv', ''))
+            st.write(df)
+
+def save_technical_yaml(config, key):
+    technical_yaml_staging_filepath = f'config/{config["technical_yaml"]["common"]["model_name"]}/technical.yaml'
+    with open(technical_yaml_filepath, 'w') as file:
+        yaml.safe_dump(data, file)

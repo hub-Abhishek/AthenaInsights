@@ -80,41 +80,6 @@ with st.expander("Model performance plots"):
 
 ##################################################################################################
 
-def plot_categorization(df, date_selected, dependent_field_name, predicted_field_name, st):
-    """Plot categorization for a given day with dynamic field selection."""
-    plt.figure(figsize=(14, 7))
-    fig, axs = plt.subplots(2, 1, figsize=(14, 14))
-    axs[0].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[0].scatter(df[df['category'] == cat].us_eastern_timestamp,
-                       df[df['category'] == cat][dependent_field_name],
-                       color=color, label=f'Category {cat}',
-                       s=30 if cat != 'C' else 0)
-    axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
-
-    axs[1].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[1].scatter(df[df[predicted_field_name] == cat].us_eastern_timestamp,
-                       df[df[predicted_field_name] == cat][dependent_field_name],
-                       color=color, label=f'Preds {cat}',
-                       s=20 if cat != 'C' else 0)
-    axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
-
-    plt.legend()
-    plt.title(f'Price Categorization on {date_selected}')
-    plt.xlabel('Timestamp')
-    plt.ylabel(f'Close Price')
-    st.pyplot(plt)
-
-def find_true_column(row):
-    for col in ['A', 'B', 'C']:
-        if row[col]:
-            return col
-    return 'C'
 
 # Apply the function to each row and create a new column
 # df['True_Column'] = df.apply(find_true_column, axis=1)
