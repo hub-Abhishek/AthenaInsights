@@ -18,6 +18,11 @@ st.title("Configuration Manager - technicals")
 
 
 config = load_config()
+version = config['technical_yaml']['common']['model_name'].split('_')[-1]
+version_number = int(version.replace('v', ''))
+config['technical_yaml']['common']['model_name'] = config['technical_yaml']['common']['model_name'].replace(str(version_number), str(version_number+1))
+
+
 with st.expander("Common Configuration"):
     # st.subheader("Common Configuration")
     col1, col2, col3 = st.columns(3)
@@ -139,7 +144,6 @@ with st.expander("Data Preparation Configuration"):
 
 with st.expander("Feature Preparation Configuration"):
     # st.subheader("Feature Preparation Configuration")
-    st.text(config['technical_yaml']['feature_prep'].keys())
     
     col1, col2, col3 = st.columns(3)
     key_1 = 'features_to_be_calculated'
@@ -181,8 +185,9 @@ with st.expander("Feature Preparation Configuration"):
     with col3:
         # Use session state to temporarily hold the input value
         st.text_input(f"New value for {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
-
-        
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'other_features'
     key_2 = 'features_to_be_calculated'
     with col1:
         st.write("Parameter name")  # Display the key
@@ -195,37 +200,168 @@ with st.expander("Feature Preparation Configuration"):
         st.text_input(f"New value for {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
 
     st.write("---")
-
-
-st.subheader("Feature Preparation Configuration")
-edited_feature_prep = st.text_area("Edit Feature Prep Configurations", yaml.safe_dump(config['technical_yaml']['feature_prep'], default_flow_style=False), height=400)
-if st.button('Save Feature Prep Changes', key='feature_prep'):
-    new_data = yaml.safe_load(edited_feature_prep)
-    save_config(config, 'feature_prep', new_data)
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'dependent_var'
+    key_2 = 'based_on'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
         
-# Tabs for each major section of the configuration
-tab_keys = ["Common", "Data Ingestion", "Data Prep", "Feature Prep", "Model", "Modeling"]
-tabs = st.tabs(tab_keys)
+    key_2 = 'prev_data_points'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'positive_slope_threshold'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'negative_slope_threshold'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'positive_rise_threshold'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'negative_drop_threshold'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'positive_future_window'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+        
+    key_2 = 'negative_future_window'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1 + ': ' + key_2)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['feature_prep'][key_1][key_2])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"Updated {key_1}: {key_2}", value=config['technical_yaml']['feature_prep'][key_1][key_2])
+
+    st.write("---")
 
 
+with st.expander("Model Configuration"):
+    # st.subheader("Feature Preparation Configuration")
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'model_selection'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['model'][key_1])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"New value for {key_1}", value=config['technical_yaml']['model'][key_1])
 
-with tabs[3]:
-    st.subheader("Feature Preparation Configuration")
-    edited_feature_prep = st.text_area("Edit Feature Prep Configurations", yaml.safe_dump(config['technical_yaml']['feature_prep'], default_flow_style=False), height=400)
-    if st.button('Save Feature Prep Changes', key='feature_prep'):
-        new_data = yaml.safe_load(edited_feature_prep)
-        save_config(config, 'feature_prep', new_data)
+    st.write("---")
+    
+with st.expander("Modeling Configuration"):
+    # st.subheader("Feature Preparation Configuration")
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'category_map'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['modeling'][key_1])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"New value for {key_1}", value=config['technical_yaml']['modeling'][key_1])
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'start_date'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['modeling'][key_1])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"New value for {key_1}", value=config['technical_yaml']['modeling'][key_1])
+    
+    col1, col2, col3 = st.columns(3)
+    key_1 = 'end_date'
+    with col1:
+        st.write("Parameter name")  # Display the key
+        st.text(key_1)  # Display the key
+    with col2:
+        st.write("Parameter Value")  # Display the key
+        st.text(config['technical_yaml']['modeling'][key_1])  # Display the key
+    with col3:
+        # Use session state to temporarily hold the input value
+        st.text_input(f"New value for {key_1}", value=config['technical_yaml']['modeling'][key_1])
 
-with tabs[4]:
-    st.subheader("Model Configuration")
-    edited_model = st.text_area("Edit Model Configurations", yaml.safe_dump(config['technical_yaml']['model'], default_flow_style=False), height=150)
-    if st.button('Save Model Changes', key='model'):
-        new_data = yaml.safe_load(edited_model)
-        save_config(config, 'model', new_data)
+    st.write("---")
 
-with tabs[5]:
-    st.subheader("Modeling Configuration")
-    edited_modeling = st.text_area("Edit Modeling Configurations", yaml.safe_dump(config['technical_yaml']['modeling'], default_flow_style=False), height=250)
-    if st.button('Save Modeling Changes', key='modeling'):
-        new_data = yaml.safe_load(edited_modeling)
-        save_config(config, 'modeling', new_data)
+
+def create_new_config(config):
+    folder = config['technical_yaml']['common']['model_name']
+    
+    path_yaml = f'config/{folder}/paths.yaml'
+    with open(config_loc, 'w+') as ff:
+        yaml.dump(config['technical_yaml'], ff)
+
+    path_yaml = f'config/{folder}/technical.yaml'
+    with open(config_loc, 'w+') as ff:
+        yaml.dump(config['technical_yaml'], ff)
+
+st.button('Configure and build', on_click=create_new_config)

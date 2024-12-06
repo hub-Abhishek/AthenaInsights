@@ -40,13 +40,32 @@ def load_yaml(path):
         file = yaml.safe_load(file)
     return file
 
+    import os
+import re
+
+def find_newest_version_folder(base_path):
+    pattern = r"spy_30min_v(\d+)$"
+    folders = os.listdir(base_path)
+    max_version = -1
+    newest_folder = None
+    for folder in folders:
+        match = re.match(pattern, folder)
+        if match:
+            version = int(match.group(1))
+            if version > max_version:
+                max_version = version
+                newest_folder = folder
+    return newest_folder
+
+
 def load_config():
     config = {}
+    newest_folder = find_newest_version_folder('config')
 
-    path_yaml = 'config/spy_30min_v1/paths.yaml'
+    path_yaml = f'config/{newest_folder}/paths.yaml'
     config['paths_config'] = load_yaml(path_yaml)
 
-    technical_yaml = 'config/spy_30min_v1/technical.yaml'
+    technical_yaml = f'config/{newest_folder}/technical.yaml'
     config['technical_yaml'] = load_yaml(technical_yaml)
 
     return config

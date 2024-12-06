@@ -96,7 +96,7 @@ with st.expander("Predictions vs reality"):
     # st.write(next_day_results[next_day_results.pred_category!='C'])
 
 # Display classification reports, confusion matrices
-with st.expander("Confuion Matrices and other metrics"):
+# with st.expander("Confuion Matrices and other metrics"):
     # display_clasification_report(st, )
     # st.markdown("---")
     # confusion_matrix_rep_1_day(st, other_results_dir)
