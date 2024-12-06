@@ -1,5 +1,6 @@
 import streamlit as st
 import yaml
+import os
 from misc.utils import load_config
 from misc.frontend_utils import save_technical_yaml
 
@@ -355,13 +356,18 @@ with st.expander("Modeling Configuration"):
 
 def create_new_config(config):
     folder = config['technical_yaml']['common']['model_name']
-    
-    path_yaml = f'config/{folder}/paths.yaml'
-    with open(config_loc, 'w+') as ff:
+
+    directory = os.path.dirname(f'config/{folder}/')
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    path_yaml = f'{directory}/paths.yaml'
+    with open(path_yaml, 'w+') as ff:
         yaml.dump(config['technical_yaml'], ff)
 
-    path_yaml = f'config/{folder}/technical.yaml'
-    with open(config_loc, 'w+') as ff:
+    path_yaml = f'{directory}/technical.yaml'
+    with open(path_yaml, 'w+') as ff:
         yaml.dump(config['technical_yaml'], ff)
 
-st.button('Configure and build', on_click=create_new_config)
+if st.button('Configure and build'):
+    create_new_config(config)

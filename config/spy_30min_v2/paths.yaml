@@ -1,0 +1,249 @@
+common:
+  model_name: spy_30min_v2
+  symbols:
+  - SPY
+  - QQQ
+  - VIXM
+  - DJIA
+  - DAX
+data_ingestion:
+  alpaca_download:
+    end_date: today
+    refresh: true
+    start_date: '2024-11-18'
+    window: 3week
+data_prep:
+  durations:
+    day_level:
+    - 2D
+    - 3D
+    - 5D
+    - 10D
+    - 15D
+    - 20D
+    - 30D
+    - 50D
+    - 100D
+    - 150D
+    - 200D
+    hour_level:
+    - 120min
+    - 180min
+    - 240min
+    minute_level:
+    - 2min
+    - 3min
+    - 5min
+    - 10min
+    - 15min
+    - 20min
+    - 25min
+    - 30min
+feature_prep:
+  calc_metrics:
+    autocorrelation_removal_v1: None
+    avg:
+      days:
+        window_gt_100:
+        - 5
+        - 8
+        - 10
+        - 12
+        - 20
+        - 26
+        - 50
+        window_lt_100:
+        - 2
+        - 3
+        - 5
+        - 8
+        - 10
+        - 12
+        - 15
+        - 20
+        - 26
+        - 50
+        - 100
+        - 200
+      minutes:
+        window_gt_30:
+        - 5
+        - 8
+        - 10
+        - 12
+        - 20
+        - 26
+        - 50
+        - 100
+        - 200
+        window_lt_30:
+        - 2
+        - 3
+        - 5
+        - 8
+        - 12
+        - 10
+        - 20
+        - 26
+    macd:
+      days:
+        window_gt_100:
+        - 11
+        - 13
+        - 17
+        - 20
+        - 26
+        - 30
+        - 50
+        window_lt_100:
+        - 11
+        - 13
+        - 17
+        - 20
+        - 26
+      minutes:
+        window_gt_30:
+        - 11
+        - 13
+        - 17
+        - 20
+        - 26
+        - 30
+        - 50
+        window_lt_10:
+        - 11
+        - 13
+        - 17
+        - 20
+        - 26
+        window_lt_30:
+        - 11
+        - 13
+        - 17
+        - 20
+        - 26
+    rsi:
+      days:
+        window_gt_100:
+        - - 5
+          - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_5m
+          - close_sma_5m
+          - close_ema_10m
+          - close_sma_10m
+          - close_ema_20m
+          - close_sma_20m
+          - close_ema_50m
+          - close_sma_50m
+        window_lt_100:
+        - - 5
+          - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_5m
+          - close_sma_5m
+          - close_ema_10m
+          - close_sma_10m
+          - close_ema_20m
+          - close_sma_20m
+          - close_ema_50m
+          - close_sma_50m
+      minutes:
+        window_gt_60:
+        - - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_5m
+          - close_sma_5m
+          - close_ema_10m
+          - close_sma_10m
+          - close_ema_20m
+          - close_sma_20m
+        window_lt_10:
+        - - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_2m
+          - close_sma_2m
+        window_lt_30:
+        - - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_2m
+          - close_sma_2m
+          - close_ema_3m
+          - close_sma_3m
+          - close_ema_5m
+          - close_sma_5m
+        window_lt_60:
+        - - 7
+          - 9
+          - 11
+          - 14
+          - 17
+          - 21
+        - - close
+          - close_ema_5m
+          - close_sma_5m
+          - close_ema_10m
+          - close_sma_10m
+          - close_ema_20m
+          - close_sma_20m
+          - close_ema_50m
+          - close_sma_50m
+  dependent_var:
+    based_on: close_sma_5m
+    negative_drop_threshold: 0.0012
+    negative_future_window: 30
+    negative_slope_threshold: -0.026
+    positive_future_window: 30
+    positive_rise_threshold: 0.0007
+    positive_slope_threshold: 0.013
+    prev_data_points: 11
+  features_to_be_calculated:
+  - autocorrelation_removal_v1
+  - avg
+  - rsi
+  - macd
+  other_features:
+    base_df:
+    - stock_bars_1min_diff_avg
+    - stock_bars_1min_diff_avg
+    features_to_be_calculated:
+    - autocorrelation_removal_v1
+    - avg
+    - rsi
+    - macd
+  symbols:
+  - SPY
+model:
+  model_selection: xgboost
+modeling:
+  category_map:
+    A: 0
+    B: 1
+    C: 2
+  end_date: '2024-11-30'
+  start_date: '2024-11-01'
