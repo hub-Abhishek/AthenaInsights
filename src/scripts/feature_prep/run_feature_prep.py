@@ -1,5 +1,5 @@
 from technical_feature_prep import TechnicalFeaturePrep
-from model_custom_features import ModelCustomFeaturePrep
+from model_custom_features_prep import ModelCustomFeaturePrep
 from model_dependent_variable import ModelDependentFeaturePrep
 from model_final_training_files import ModelTrainingFilePrep
 from misc.utils import load_config

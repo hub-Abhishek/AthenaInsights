@@ -7,13 +7,14 @@ from misc.utils import log, load_yaml
 def calc():
     pass
 
-def update_config(df, loc, model_name='spy_30min_v1', store_loc='feature_store'):
+def update_config(df, loc, model_name='spy_30min_v1', store_loc='feature_store', time_period=None):
     file_name = loc.split('/')[-1]
     
     # base_class = 'feature_store' if feature_store else 'dependent_variable'
     name = file_name.split('.')[0]
     path = loc
-    time_period = name.split('_')[-3]
+    if time_period is None:
+        time_period = name.split('_')[-3]
     columns = list(df.columns)
     
     config_loc = f'config/{model_name}/features.yaml'

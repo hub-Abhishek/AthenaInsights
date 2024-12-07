@@ -98,7 +98,7 @@ class ModelDependentFeaturePrep(BaseClass):
         self.features_listing_config = load_features_config()
         
     def extract(self):
-        cols, self.path = get_paths_and_cols_from_config(self.features_listing_config, dur='1min', file='stock_bars_1min_base_avg', store_loc='feature_store', )
+        cols, self.path = get_paths_and_cols_from_config(self.features_listing_config, dur='1min', file=self.feature_prep['dependent_var']['base_df'], store_loc='feature_store', )
         base_df = read_df(self.path)
         base_df = base_df[base_df.symbol=='SPY']
         base_df = check_index_is_monotonic_increasing(base_df)
@@ -138,6 +138,9 @@ class ModelDependentFeaturePrep(BaseClass):
             base_df.loc[date.strftime('%Y-%m-%d'), 'future_lows'] = future_lows
             base_df.loc[date.strftime('%Y-%m-%d'), 'slopes'] = slopes
             del categories, future_highs, future_lows, df_day
+        
+        category_map = self.feature_prep['dependent_var']['category_map']
+        base_df['mapped_category'] = base_df['category'].map(category_map)
         return {"base_df": base_df}
     
     def save(self, dfs):

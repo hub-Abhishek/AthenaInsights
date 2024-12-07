@@ -29,6 +29,9 @@ class DataPrep(BaseClass):
         self.base_folder = self.paths_config["base_folder"]
         self.data_folder = self.paths_config["data_folder"]
 
+        self.common_config = self.config['technical_yaml']['common']
+        self.model_name = self.common_config['model_name']
+
 
     @staticmethod
     def process_dataset_min(df, datasets=None, durations=[]):
@@ -214,7 +217,7 @@ class DataPrep(BaseClass):
                 if dur in dfs[sym].keys():
                     dur_df = pd.concat([dur_df, dfs[sym][dur].assign(symbol=sym)])
             # dur_df.to_parquet(f'{self.bucket_loc}/{self.data_folder}/data_prep/stock_bars_{dur}.parquet')
-            save_df_as_parquet(dur_df, f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/data_prep/stock_bars_{dur}.parquet')
+            save_df_as_parquet(dur_df, f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/{self.model_name}/data_prep/stock_bars_{dur}.parquet')
 
 
 if __name__=='__main__':

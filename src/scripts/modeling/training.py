@@ -58,8 +58,9 @@ class ModelTraining(BaseClass):
         self.calc_metrics = self.feature_prep['calc_metrics']
 
         self.model_name = self.common_config['model_name']
-        self.model_base_path = f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/{self.paths_config["model_base_folder"]}'
-        self.model_results_path = f'{self.model_base_path}/{self.model_results_folder}/{self.model_name}'
+        self.model_base_path = f'{self.bucket_loc}/{self.base_folder}/{self.data_folder}/{self.model_name}/{self.paths_config["model_base_folder"]}'
+        self.model_results_path = f'{self.model_base_path}/{self.model_results_folder}'
+        self.training_file_path = f'{self.model_base_path}/{self.paths_config["model_data_folder"]}'
 
         self.features_listing_config = load_features_config()
 
@@ -72,15 +73,25 @@ class ModelTraining(BaseClass):
                                 num_class=3,
                                 eval_metric=['merror','mlogloss'])
 
-        df = read_df('s3://sisyphus-general-bucket/AthenaInsights/latest_data/model/data/stock_bars_1min_base_avg_base_rsi_base_macd_base_otherfeatures_base_avg.parquet' )
+        training_files = []
+        log(f'training files config - {self.features_listing_config["training_files"]}')
+        
+        for k in self.features_listing_config['training_files'].keys():
+            for file in self.features_listing_config['training_files'][k].keys():
+                training_files.append(file)
+        if len(training_files)==1:
+            df = read_df(self.features_listing_config['training_files'][k][file]['path'])
+        else:
+            log(f'training files - {training_files}')
+            raise ValueError('which training file? please check features config')
 
 
-        category_map = self.modeling_config['category_map']
-        reverse_category_map = {v: k for k, v in category_map.items()}
-        df['mapped_category'] = df['category'].map({'A': 0, 'B': 1, 'C':2})
-        df['mapped_category'].value_counts()
-        df = df.drop(columns=['symbol', 'symbol1', 'category'])
-        df = pd.concat([df.drop(columns='direction'), pd.get_dummies(df['direction'], drop_first=True)], axis=1)
+        # category_map = self.modeling_config['category_map']
+        # reverse_category_map = {v: k for k, v in category_map.items()}
+        # df['mapped_category'] = df['category'].map({'A': 0, 'B': 1, 'C':2})
+        # df['mapped_category'].value_counts()
+        # df = df.drop(columns=['symbol', 'symbol1', 'category'])
+        # df = pd.concat([df.drop(columns='direction'), pd.get_dummies(df['direction'], drop_first=True)], axis=1)
         df = df.fillna(0)
 
         start_date = self.modeling_config['start_date']
@@ -95,9 +106,7 @@ class ModelTraining(BaseClass):
         return {
             'df': df,
             'model': model,
-            'date_series': date_series,
-            'category_map': category_map,
-            'reverse_category_map': reverse_category_map
+            'date_series': date_series
         }
 
     @staticmethod
@@ -230,16 +239,12 @@ class ModelTraining(BaseClass):
         ax.legend()
         plt.ylabel('merror')
         plt.title(f'GridSearchCV XGBoost merror - {dt}')
-        # plt.show()
-        # fig.savefig(f'{images_directory}/XGBoost merror - {dt}.png')
         self.save_image(plt, f'{images_subfolder}/XGBoost merror - {dt}.png')
 
     def train(self, dfs):
         df = dfs['df']
         model = dfs['model']
         date_series = dfs['date_series']
-
-        log(f"reverse_category_map - {dfs['reverse_category_map']}")
 
         for dt in tqdm(date_series):
             log(f"running for dt = {dt}")
@@ -255,11 +260,6 @@ class ModelTraining(BaseClass):
             if y_test_full.empty:
                 break
 
-            # log(f"y_train.value_counts():{y_train.value_counts()}")
-            # log(f"y_test_only_next_day.value_counts():\n{y_test_only_next_day.value_counts()}")
-            # log(f"y_test_next_10_days.value_counts():\n{y_test_next_10_days.value_counts()}")
-            # log(f"y_test_full.value_counts():\n{y_test_full.value_counts()}")
-
             log("training the model")
             clf = self. initialte_and_train(model, X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full)
             self.save_model(clf, models_subfolder)
@@ -268,17 +268,17 @@ class ModelTraining(BaseClass):
             log("results")
             self.save_train_plots(clf, dt, images_subfolder)
 
-            if not X_test_only_next_day.empty:
-                log("1 day test")
-                self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', dt, texts_subfolder)
+#             if not X_test_only_next_day.empty:
+#                 log("1 day test")
+#                 self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', dt, texts_subfolder)
 
-            if not X_test_next_10_days.empty:
-                log("10 day test")
-                self.generate_reports(X_test_next_10_days, y_test_next_10_days, clf, '10_day', dt, texts_subfolder)
+#             if not X_test_next_10_days.empty:
+#                 log("10 day test")
+#                 self.generate_reports(X_test_next_10_days, y_test_next_10_days, clf, '10_day', dt, texts_subfolder)
 
-            if not X_test_full.empty:
-                log("full test")
-                self.generate_reports(X_test_full, y_test_full, clf, 'full', dt, texts_subfolder, df)
+#             if not X_test_full.empty:
+#                 log("full test")
+#                 self.generate_reports(X_test_full, y_test_full, clf, 'full', dt, texts_subfolder, df)
 
             feature_important = clf.feature_importances_ 
             keys = list(X_train.columns)
@@ -287,9 +287,18 @@ class ModelTraining(BaseClass):
             log("feature importances")
             fea_imp = pd.DataFrame(data=values, index=keys, columns=["score"]).sort_values(by = "score", ascending=True)
             save_df_as_csv(fea_imp, f'{texts_subfolder}/feature_importances.csv')
-            
+
+            if not X_test_only_next_day.empty:
+                y_p = clf.predict(X_test_only_next_day)
+
+                y_proba = clf.predict_proba(X_test_only_next_day)
+                y_proba = pd.DataFrame(y_proba)
+                y_proba['pred'] = y_p
+                y_proba['actual'] = y_test_only_next_day
+                save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba.csv')
+
         self.upload_config()
-        
+
     def upload_config(self):
         log(f'uploading config files to {self.model_results_path}/paths.yaml')
         log(os.path.exists('config/spy_30min_v1/paths.yaml'))

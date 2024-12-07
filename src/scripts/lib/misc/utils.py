@@ -153,17 +153,24 @@ def get_all_paths_from_loc(client, bucket, loc, filters=None):
         paths = [x for x in paths if filters in x]
     return paths
 
-def get_name_and_type(path):
-    file_name = path.split('/')[-1]
-    
-    df_type = file_name.split('/')[-1].split('.')[1]
-    name = file_name.split('.')[0]
+def extract_properties_from_name(name):
     if len(name.split('_'))>=5:
         features_type = name.split('_')[-1]
         base_or_diff = name.split('_')[-2]
         duration = name.split('_')[-3]
         duration, duration_unit = re.match(r'^(\d+)([a-zA-Z]+)$', duration).groups()
         duration = int(duration)
+        return name, features_type, base_or_diff, duration, duration_unit
+    else:
+        log("name doesn't follow convention")
+
+def get_name_and_type(path):
+    file_name = path.split('/')[-1]
+    
+    df_type = file_name.split('/')[-1].split('.')[1]
+    name = file_name.split('.')[0]
+    if len(name.split('_'))>=5:
+        name, features_type, base_or_diff, duration, duration_unit = extract_properties_from_name(name)
         return name, df_type, features_type, base_or_diff, duration, duration_unit
     else:
         features_type = None

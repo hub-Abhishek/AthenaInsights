@@ -107,6 +107,7 @@ class ModelCustomFeaturePrep(BaseClass):
             base_df['minute'] = base_df.us_eastern_timestamp.dt.minute
             base_df['day_of_year'] = base_df.us_eastern_timestamp.dt.day_of_year
             base_df = self.maximas_and_minimas(base_df, window_sizes=[5, 10, 15, 30])
+            base_df = pd.concat([base_df.drop(columns='direction'), pd.get_dummies(base_df['direction'], drop_first=True)], axis=1)
             base_df = base_df.drop(columns=['us_eastern_timestamp', 'direction_prev', 'date', 'prev_date', 'symbol', ])
             path = path.replace('_avg.parquet', '_otherfeatures.parquet')
             save_df_as_parquet(base_df, path)

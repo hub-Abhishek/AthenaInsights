@@ -35,6 +35,7 @@ class TechnicalFeaturePrep(BaseClass):
         self.client = boto3.client('s3')
 
         self.common_config = self.config['technical_yaml']['common']
+        self.model_name = self.common_config['model_name']
         self.feature_prep = self.config['technical_yaml']['feature_prep']
 
         self.features_to_be_calculated = self.feature_prep['features_to_be_calculated']
@@ -44,7 +45,7 @@ class TechnicalFeaturePrep(BaseClass):
 
     def remove_stationarity(self, prev_step, source_folder_for_next_step):
         log('removing stationarity')
-        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{source_folder_for_next_step}')
+        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{self.model_name}/{source_folder_for_next_step}')
         log(paths)
 
         for path in paths:
@@ -89,7 +90,7 @@ class TechnicalFeaturePrep(BaseClass):
     def calculate_moving_averages(self, prev_step, source_folder_for_next_step):
         log('calculating moving averages')
         log(f'{prev_step}, source_folder_for_next_step - {source_folder_for_next_step}')
-        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{source_folder_for_next_step}')
+        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{self.model_name}/{source_folder_for_next_step}')
         log(paths)
         for path in paths:
             name, df_type, features_type, base_or_diff, duration, duration_unit = get_name_and_type(path)
@@ -112,12 +113,12 @@ class TechnicalFeaturePrep(BaseClass):
                 df_ma = self.calculate_ma(df[['symbol'] + [x for x in df.columns if '_diff' in x]], 
                                           calc_windows=calc_windows).rename(columns={'symbol': 'symbol1'}).reset_index().set_index('us_eastern_timestamp')
                 df = pd.concat([df, df_ma[[x for x in df_ma.columns if x not in df.columns]]], axis=1)
-                loc = path.replace('reduced_autocorelation', 'feature_prep').replace('.parquet', '_diff_avg.parquet')
+                loc = path.replace('reduced_autocorelation', f'feature_prep').replace('.parquet', '_diff_avg.parquet')
             else:
                 df_ma = self.calculate_ma(df, 
                                           calc_windows=calc_windows).rename(columns={'symbol': 'symbol1'}).reset_index().set_index('us_eastern_timestamp')
                 df = pd.concat([df, df_ma[[x for x in df_ma.columns if x not in df.columns]]], axis=1)
-                loc = path.replace('data_prep', 'feature_prep').replace('.parquet', '_base_avg.parquet')
+                loc = path.replace('data_prep', f'feature_prep').replace('.parquet', '_base_avg.parquet')
             # import pdb;pdb.set_trace();
             del df_ma
             log(f'new df.shape - {df.shape}')
@@ -171,7 +172,7 @@ class TechnicalFeaturePrep(BaseClass):
         log('calculating rsi')
         log(f'{prev_step}, source_folder_for_next_step - {source_folder_for_next_step}')
         
-        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{source_folder_for_next_step}', filters=f'_{prev_step}.parquet')
+        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{self.model_name}/{source_folder_for_next_step}', filters=f'_{prev_step}.parquet')
         log(paths)
         
         for path in paths:
@@ -250,7 +251,7 @@ class TechnicalFeaturePrep(BaseClass):
         log('calculating rsi')
         log(f'{prev_step}, source_folder_for_next_step - {source_folder_for_next_step}')
         
-        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{source_folder_for_next_step}', filters=f'_{prev_step}.parquet')
+        paths = get_all_paths_from_loc(self.client, self.paths_config["s3_bucket"], f'{self.base_folder}/{self.data_folder}/{self.model_name}/{source_folder_for_next_step}', filters=f'_{prev_step}.parquet')
         log(paths)
         
         for path in paths:
@@ -281,6 +282,7 @@ class TechnicalFeaturePrep(BaseClass):
                 self.remove_stationarity(prev_step, source_folder_for_next_step)
                 prev_step = feature_name
                 source_folder_for_next_step = self.reduced_autocorelation_folder
+                # import pdb; pdb.set_trace();
 
             elif feature_name=='avg':
                 self.calculate_moving_averages(prev_step, source_folder_for_next_step=self.data_prep_folder)
