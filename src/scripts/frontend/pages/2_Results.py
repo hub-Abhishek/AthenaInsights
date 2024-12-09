@@ -98,8 +98,8 @@ with st.expander("Predictions vs reality"):
         proba_df['category'] = proba_df.actual.map({0:'A', 1: 'B', 2: 'C'})
         proba_df['pred_category_after_confidence'] = (proba_df[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
         st.write(proba_df.shape)
-        # plot_categorization(proba_df, date_selected, 'close', 'pred_category', st)
-        plot_categorization_only_predicted(proba_df, date_selected, 'close', 'pred_category', st)
+        plot_categorization(proba_df, date_selected, 'close', 'pred_category', st)
+        # plot_categorization_only_predicted(proba_df, date_selected, 'close', 'pred_category', st)
     else:
         st.write('No data available for the selected date. Please choose a different date.')
     # plot_categorization(y_proba_1_day, date_selected, 'close', 'pred_category_after_confidence', st)
