@@ -66,12 +66,13 @@ other_results_dir = f'{directory}/{date_selected}/texts'
 # Load probabilities and dependent variables
 files = list_files(other_results_dir)
 dfs = {}
-if 'y_proba_full.csv' in files:
-    dfs['y_proba_full'] = pd.read_csv(f'{other_results_dir}/y_proba_full.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+if 'y_proba_1_day.csv' in files:
+    dfs['y_proba_1_day'] = pd.read_csv(f'{other_results_dir}/y_proba_1_day.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
 elif 'y_proba_10_day.csv' in files:
     dfs['y_proba_10_day'] = pd.read_csv(f'{other_results_dir}/y_proba_10_day.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
-elif 'y_proba_1_day.csv' in files:
-    dfs['y_proba_1_day'] = pd.read_csv(f'{other_results_dir}/y_proba_1_day.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+elif 'y_proba_full.csv' in files:
+    dfs['y_proba_full'] = pd.read_csv(f'{other_results_dir}/y_proba_full.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+
 # dfs['dependent_var'] = pd.read_parquet(f'{directory}/dependent_var.parquet').reset_index()
 # dependent_var = dependent_var[dependent_var.us_eastern_timestamp.dt.date>=pd.to_datetime(date_selected).date()].reset_index(drop=True)
 # results = pd.concat([dependent_var, y_proba], axis=1)
@@ -91,11 +92,16 @@ with st.expander("Model performance plots"):
 # Display plots
 with st.expander("Predictions vs reality"):
     # st.write('Spy Plots')
-    proba_df = dfs['y_proba_1_day'] if 'y_proba_1_day' in dfs.keys() else dfs['y_proba_10_day'] if 'y_proba_10_day' in dfs.keys() else dfs['y_proba_full']
-    proba_df['pred_category'] = proba_df.pred.map({0:'A', 1: 'B', 2: 'C'})
-    proba_df['category'] = proba_df.actual.map({0:'A', 1: 'B', 2: 'C'})
-    proba_df['pred_category_after_confidence'] = (proba_df[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
-    plot_categorization(proba_df, date_selected, 'close', 'pred_category', st)
+    st.write(dfs.keys())
+    if 'y_proba_1_day' in dfs.keys():
+        proba_df = dfs['y_proba_1_day'] if 'y_proba_1_day' in dfs.keys() else dfs['y_proba_10_day'] if 'y_proba_10_day' in dfs.keys() else dfs['y_proba_full']
+        proba_df['pred_category'] = proba_df.pred.map({0:'A', 1: 'B', 2: 'C'})
+        proba_df['category'] = proba_df.actual.map({0:'A', 1: 'B', 2: 'C'})
+        proba_df['pred_category_after_confidence'] = (proba_df[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
+        st.write(proba_df.shape)
+        # plot_categorization(proba_df, date_selected, 'close', 'pred_category', st)
+    else:
+        st.write('No data available for the selected date. Please choose a different date.')
     # plot_categorization(y_proba_1_day, date_selected, 'close', 'pred_category_after_confidence', st)
 
     # st.write(proba_df.head())
