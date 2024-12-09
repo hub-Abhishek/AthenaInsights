@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from misc.utils import load_config, read_df
 from misc.frontend_utils import *
+import datetime
 
 # Setting display format for float data
 pd.set_option('display.float_format', '{:.10f}'.format)
@@ -48,10 +49,10 @@ with columns[1]:
     dates = list_directories(directory)
 
     # Dropdown to select a date
-    date_selected = st.selectbox(
-        "Select the date you're interested in",
-        (dates),
-    )
+    date_selected = st.date_input("Select the date you're interested in", 
+                                  min_value=pd.to_datetime(dates[0]), 
+                                  max_value=pd.to_datetime(dates[-1]), 
+                                  value=pd.to_datetime(dates[-1]))
 
 with columns[2]:
     slider = st.slider('Confidence level', min_value=0.0, max_value=1.0, value=0.5)
@@ -91,8 +92,6 @@ with st.expander("Model performance plots"):
 
 # Display plots
 with st.expander("Predictions vs reality"):
-    # st.write('Spy Plots')
-    st.write(dfs.keys())
     if 'y_proba_1_day' in dfs.keys():
         proba_df = dfs['y_proba_1_day'] if 'y_proba_1_day' in dfs.keys() else dfs['y_proba_10_day'] if 'y_proba_10_day' in dfs.keys() else dfs['y_proba_full']
         proba_df['pred_category'] = proba_df.pred.map({0:'A', 1: 'B', 2: 'C'})
@@ -100,6 +99,7 @@ with st.expander("Predictions vs reality"):
         proba_df['pred_category_after_confidence'] = (proba_df[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
         st.write(proba_df.shape)
         # plot_categorization(proba_df, date_selected, 'close', 'pred_category', st)
+        plot_categorization_only_predicted(proba_df, date_selected, 'close', 'pred_category', st)
     else:
         st.write('No data available for the selected date. Please choose a different date.')
     # plot_categorization(y_proba_1_day, date_selected, 'close', 'pred_category_after_confidence', st)

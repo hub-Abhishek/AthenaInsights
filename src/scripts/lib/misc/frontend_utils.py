@@ -2,6 +2,7 @@ import boto3
 import os
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.ticker import AutoMinorLocator
 from misc.utils import read_df, load_config, log
 
@@ -88,37 +89,6 @@ def display_images_in_rows(images_generated_during_training, images_per_row, st,
             with columns[idx]:
                 st.image(image, caption=image_file, use_column_width=True)
 
-# Plot categorization results
-def plot_categorization(df, date_selected, dependent_field_name, predicted_field_name, st):
-    """Plot categorization for a given day with dynamic field selection."""
-    plt.figure(figsize=(14, 7))
-    fig, axs = plt.subplots(2, 1, figsize=(14, 14))
-    axs[0].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[0].scatter(df[df['category'] == cat].us_eastern_timestamp,
-                       df[df['category'] == cat][dependent_field_name],
-                       color=color, label=f'Category {cat}',
-                       s=30 if cat != 'C' else 0)
-    axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    # axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
-
-    axs[1].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
-    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
-        axs[1].scatter(df[df[predicted_field_name] == cat].us_eastern_timestamp,
-                       df[df[predicted_field_name] == cat][dependent_field_name],
-                       color=color, label=f'Preds {cat}',
-                       s=20 if cat != 'C' else 0)
-    axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    # axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
-
-    plt.legend()
-    plt.title(f'Price Categorization on {date_selected}')
-    plt.xlabel('Timestamp')
-    plt.ylabel(f'Close Price')
-    st.pyplot(plt)
-
 def find_true_column(row):
     for col in ['A', 'B', 'C']:
         if row[col]:
@@ -149,3 +119,54 @@ def save_technical_yaml(config, key):
     technical_yaml_filepath = f'config/{config["technical_yaml"]["common"]["model_name"]}/technical.yaml'
     with open(technical_yaml_filepath, 'w') as file:
         yaml.safe_dump(data, file)
+
+
+def plot_categorization(df, date_selected, dependent_field_name, predicted_field_name, st):
+    """Plot categorization for a given day with dynamic field selection."""
+    plt.figure(figsize=(14, 7))
+    fig, axs = plt.subplots(2, 1, figsize=(14, 14))
+    x = np.asarray(df.us_eastern_timestamp, dtype='datetime64[s]')
+    axs[0].plot(x, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
+    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+        axs[0].scatter(df[df['category'] == cat].us_eastern_timestamp,
+                       df[df['category'] == cat][dependent_field_name],
+                       color=color, label=f'Category {cat}',
+                       s=30 if cat != 'C' else 0)
+    axs[0].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
+    axs[0].tick_params(axis='x', labelrotation=90)
+
+    axs[1].plot(x, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
+    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
+        axs[1].scatter(df[df[predicted_field_name] == cat].us_eastern_timestamp,
+                       df[df[predicted_field_name] == cat][dependent_field_name],
+                       color=color, label=f'Preds {cat}',
+                       s=20 if cat != 'C' else 0)
+    axs[1].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
+    axs[1].tick_params(axis='x', labelrotation=90)
+
+    plt.legend()
+    plt.title(f'Price Categorization on {date_selected}')
+    plt.xlabel('Timestamp')
+    plt.ylabel(f'Close Price')
+    st.pyplot(plt)
+
+def plot_categorization_only_predicted(df, date_selected, dependent_field_name, predicted_field_name, st):
+    """Plot categorization for a given day with dynamic field selection."""
+    plt.figure(figsize=(14, 4))
+    fig, axs = plt.subplots(1, 1, figsize=(14, 7))
+    x = np.asarray(df.us_eastern_timestamp, dtype='datetime64[s]')
+    axs.plot(x, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
+    for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):        
+        axs.scatter(df[df[predicted_field_name] == cat].us_eastern_timestamp,
+                       df[df[predicted_field_name] == cat][dependent_field_name],
+                       color=color, label=f'Preds {cat}',
+                       marker='s',
+                       s=20 if cat != 'C' else 0)
+    axs.xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
+    axs.tick_params(axis='x', labelrotation=90)
+
+    plt.legend()
+    plt.title(f'Price Categorization on {date_selected}')
+    plt.xlabel('Timestamp')
+    plt.ylabel(f'Close Price')
+    st.pyplot(plt)
