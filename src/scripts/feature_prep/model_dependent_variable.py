@@ -114,7 +114,10 @@ class ModelDependentFeaturePrep(BaseClass):
         base_df['future_highs'] = np.nan
         base_df['future_lows'] = np.nan
         base_df['slopes'] = np.nan
-        base_df = base_df[['open', 'high', 'low', 'close', 'close_sma_5m', 'category', 'future_highs', 'future_lows', 'slopes']]
+        relevant_fields = ['open', 'high', 'low', 'close', 'close_ema_5m', 'close_sma_5m', 'category', 'future_highs', 'future_lows', 'slopes']
+        if field not in relevant_fields:
+            relevant_fields.append(field)
+        base_df = base_df[relevant_fields]
         base_df[field] = np.where(base_df[field].isna(), base_df.close, base_df[field])
         
         
