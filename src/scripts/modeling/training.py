@@ -74,7 +74,7 @@ class ModelTraining(BaseClass):
                                 eval_metric=['merror','mlogloss'])
 
         training_files = []
-        log(f'training files config - {self.features_listing_config["training_files"]}')
+        # log(f'training files config - {self.features_listing_config["training_files"]}')
         
         for k in self.features_listing_config['training_files'].keys():
             for file in self.features_listing_config['training_files'][k].keys():
@@ -93,6 +93,9 @@ class ModelTraining(BaseClass):
         # df = df.drop(columns=['symbol', 'symbol1', 'category'])
         # df = pd.concat([df.drop(columns='direction'), pd.get_dummies(df['direction'], drop_first=True)], axis=1)
         df = df.fillna(0)
+        log(f'train_on_market_open_only - {self.modeling_config["train_on_market_open_only"]}, predict_on_market_open_only - {self.modeling_config["predict_on_market_open_only"]}')
+        if self.modeling_config['train_on_market_open_only']:
+            df = df['market_open']
 
         start_date = self.modeling_config['start_date']
         end_date = self.modeling_config['end_date']
@@ -118,14 +121,18 @@ class ModelTraining(BaseClass):
         return test_date, next_day, next_10_day, prev_day
 
     @staticmethod
-    def get_train_test_split(df, test_date, next_day, next_10_day, prev_day ):
+    def get_train_test_split(df, test_date, next_day, next_10_day, prev_day, predict_on_market_open_only):
 
         df = df.drop(columns=df.select_dtypes(include='object').columns)
         X_train = df.loc[:prev_day, ].drop(columns=['mapped_category'])
         y_train = df.loc[:prev_day, 'mapped_category']
 
+        if predict_on_market_open_only is True:
+            df = df[df.market_open]
+            
         X_test_only_next_day = df.loc[test_date, ].drop(columns=['mapped_category'])
         y_test_only_next_day = df.loc[test_date, 'mapped_category']
+            
 
         X_test_next_10_days = df.loc[test_date: next_10_day, ].drop(columns=['mapped_category'])
         y_test_next_10_days = df.loc[test_date: next_10_day, 'mapped_category']
@@ -184,17 +191,6 @@ class ModelTraining(BaseClass):
         img_data.seek(0)
         self.bucket_resource.put_object(Body=img_data, ContentType='image/png', Key=name)
 
-    def save_smaller_reports(self, report, name):
-        name = name.replace(f'{self.bucket_loc}/', '')
-        log(f'report path - {name}')
-        s3 = boto3.client('s3')
-        bucket_name = self.paths_config["s3_bucket"]
-
-        buffer = BytesIO()
-        pickle.dump(report, buffer)
-        buffer.seek(0)
-        s3.upload_fileobj(buffer, bucket_name, name)
-
 #         import boto3
 #         from io import BytesIO
 #         import pickle
@@ -212,6 +208,19 @@ class ModelTraining(BaseClass):
 #         # Load the accuracy score from the buffer using pickle
 #         loaded_accuracy = pickle.load(buffer)
 #         print(f'Loaded Accuracy Score: {loaded_accuracy}')
+
+    def upload_config(self):
+        log(f'uploading config files to {self.model_results_path}/paths.yaml')
+        log(os.path.exists(f'config/{self.model_name}/paths.yaml'))
+        self.client.upload_file(f'config/{self.model_name}/paths.yaml', 
+                                self.paths_config['s3_bucket'], 
+                                f"{self.model_results_path}/paths.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
+        self.client.upload_file(f'config/{self.model_name}/features.yaml', 
+                                self.paths_config['s3_bucket'], 
+                                f"{self.model_results_path}/features.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
+        self.client.upload_file(f'config/{self.model_name}/technical.yaml', 
+                                self.paths_config['s3_bucket'], 
+                                f"{self.model_results_path}/technical.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
 
     def save_train_plots(self, clf, dt, images_subfolder):
         results = clf.evals_result()
@@ -241,6 +250,23 @@ class ModelTraining(BaseClass):
         plt.title(f'GridSearchCV XGBoost merror - {dt}')
         self.save_image(plt, f'{images_subfolder}/XGBoost merror - {dt}.png')
 
+    def generate_reports(self, x, y, clf, dur, texts_subfolder):
+        y_p = clf.predict(x)
+
+        y_proba = clf.predict_proba(x)
+        y_proba = pd.DataFrame(y_proba)
+        y_proba['pred'] = y_p
+        y_proba['actual'] = y.values
+        y_proba['market_open'] = x.market_open
+        y_proba['close'] = x.close
+        if 'close_diff_ema_5m' in x.columns:
+            y_proba['close_diff_ema_5m'] = x.close_diff_ema_5m
+        elif 'close_ema_5m' in x.columns:
+            y_proba['close_ema_5m'] = x.close_ema_5m
+        y_proba.index = y.index
+        # import pdb;pdb.set_trace();
+        save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
+
     def train(self, dfs):
         df = dfs['df']
         model = dfs['model']
@@ -256,7 +282,8 @@ class ModelTraining(BaseClass):
             test_date, next_day, next_10_day, prev_day = self.get_dates(dt)
             log(f"test_date: {test_date}, next_day: {next_day}, next_10_day: {next_10_day}, prev_day: {prev_day}")
 
-            X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full = self.get_train_test_split(df, test_date, next_day, next_10_day, prev_day)
+            X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full = self.get_train_test_split(df, test_date, next_day, next_10_day, prev_day, self.modeling_config["predict_on_market_open_only"])
+            
             if y_test_full.empty:
                 break
 
@@ -268,111 +295,26 @@ class ModelTraining(BaseClass):
             log("results")
             self.save_train_plots(clf, dt, images_subfolder)
 
-#             if not X_test_only_next_day.empty:
-#                 log("1 day test")
-#                 self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', dt, texts_subfolder)
-
-#             if not X_test_next_10_days.empty:
-#                 log("10 day test")
-#                 self.generate_reports(X_test_next_10_days, y_test_next_10_days, clf, '10_day', dt, texts_subfolder)
-
-#             if not X_test_full.empty:
-#                 log("full test")
-#                 self.generate_reports(X_test_full, y_test_full, clf, 'full', dt, texts_subfolder, df)
-
-            feature_important = clf.feature_importances_ 
-            keys = list(X_train.columns)
-            values = list(feature_important)
-
-            log("feature importances")
-            fea_imp = pd.DataFrame(data=values, index=keys, columns=["score"]).sort_values(by = "score", ascending=True)
-            save_df_as_csv(fea_imp, f'{texts_subfolder}/feature_importances.csv')
-
             if not X_test_only_next_day.empty:
-                y_p = clf.predict(X_test_only_next_day)
+                log("1 day test")
+                self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', texts_subfolder)
+                # self.generate_reports(X_test_only_next_day, y_test_only_next_day, clf, '1_day', dt, texts_subfolder)
 
-                y_proba = clf.predict_proba(X_test_only_next_day)
-                y_proba = pd.DataFrame(y_proba)
-                y_proba['pred'] = y_p
-                y_proba['actual'] = y_test_only_next_day
-                save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba.csv')
+            if not X_test_next_10_days.empty:
+                log("10 day test")
+                self.generate_reports(X_test_next_10_days, y_test_next_10_days, clf, '10_day', texts_subfolder)
+
+            if not X_test_full.empty:
+                log("full test")
+                self.generate_reports(X_test_full, y_test_full, clf, 'full', texts_subfolder)
+                
+            log("feature importances")
+            fea_imp = pd.DataFrame(data=list(clf.feature_importances_ ), index=list(X_train.columns), columns=["score"]).sort_values(by = "score", ascending=True)
+            save_df_as_csv(fea_imp, f'{texts_subfolder}/feature_importances.csv')
+            
+            del clf, X_train, y_train, X_test_only_next_day, y_test_only_next_day, X_test_next_10_days, y_test_next_10_days, X_test_full, y_test_full, fea_imp
 
         self.upload_config()
-
-    def upload_config(self):
-        log(f'uploading config files to {self.model_results_path}/paths.yaml')
-        log(os.path.exists('config/spy_30min_v1/paths.yaml'))
-        self.client.upload_file('config/spy_30min_v1/paths.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/paths.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
-        self.client.upload_file('config/spy_30min_v1/features.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/features.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
-        self.client.upload_file('config/spy_30min_v1/technical.yaml', self.paths_config['s3_bucket'], f"{self.model_results_path}/technical.yaml".replace('s3://', '').replace(self.paths_config['s3_bucket'], ''))
-        
-
-            # if not X_test_only_next_day.empty:
-            #     preds_probs = clf.predict_proba(X_test_only_next_day)
-            #     preds_probs1 = (preds_probs >= 0.5).argmax(axis=1,)
-            #     plot_categorization(df, dt, pd.Series(preds_probs1).map(reverse_category_map))
-
-    def generate_reports(self, x, y, clf, dur, dt, texts_subfolder, df=None):
-        y_p = clf.predict(x)
-        
-        y_proba = clf.predict_proba(x)
-        y_proba = pd.DataFrame(y_proba)
-        y_proba['pred'] = y_p
-        save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
-
-        confusion_matrix_rep = pd.DataFrame(confusion_matrix(y, y_p))
-        save_df_as_csv(confusion_matrix_rep, f'{texts_subfolder}/confusion_matrix_rep_{dur}.csv')
-
-        accuracy_score_rep = accuracy_score(y, y_p)
-        self.save_smaller_reports(accuracy_score_rep, name=f'{texts_subfolder}/accuracy_score_rep_{dur}.pkl')
-
-        balanced_accuracy_score_rep = balanced_accuracy_score(y, y_p)
-        self.save_smaller_reports(balanced_accuracy_score_rep, name=f'{texts_subfolder}/balanced_accuracy_score_rep_{dur}.pkl')
-
-        micro_precision_score_rep = precision_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_precision_score_rep, name=f'{texts_subfolder}/micro_precision_score_rep_{dur}.pkl')
-
-        micro_recall_score_rep = recall_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_recall_score_rep, name=f'{texts_subfolder}/micro_recall_score_rep_{dur}.pkl')
-
-        micro_f1_score_rep = f1_score(y, y_p, average='micro')
-        self.save_smaller_reports(micro_f1_score_rep, name=f'{texts_subfolder}/micro_f1_score_rep_{dur}.pkl')
-
-        macro_precision_score_rep = precision_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_precision_score_rep, name=f'{texts_subfolder}/macro_precision_score_rep_{dur}.pkl')
-
-        macro_recall_score_rep = recall_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_recall_score_rep, name=f'{texts_subfolder}/macro_recall_score_rep_{dur}.pkl')
-
-        macro_f1_score_rep = f1_score(y, y_p, average='macro')
-        self.save_smaller_reports(macro_f1_score_rep, name=f'{texts_subfolder}/macro_f1_score_rep_{dur}.pkl')
-
-        weighted_precision_score_rep = precision_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_precision_score_rep, name=f'{texts_subfolder}/weighted_precision_score_rep_{dur}.pkl')
-
-        weighted_recall_score_rep = recall_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_recall_score_rep, name=f'{texts_subfolder}/weighted_recall_score_rep_{dur}.pkl')
-
-        weighted_f1_score_rep = f1_score(y, y_p, average='weighted')
-        self.save_smaller_reports(weighted_f1_score_rep, name=f'{texts_subfolder}/weighted_f1_score_rep_{dur}.pkl')
-
-        classification_report_rep = pd.DataFrame(classification_report(y, y_p, output_dict=True))
-        save_df_as_csv(classification_report_rep, f'{texts_subfolder}/classification_report_{dur}.csv')
-
-        log('\n-------------------- Key Metrics --------------------')
-        log('\nAccuracy: {:.2f}'.format(accuracy_score_rep))
-        log('Balanced Accuracy: {:.2f}\n'.format(balanced_accuracy_score_rep))
-        log('Micro Precision: {:.2f}'.format(micro_precision_score_rep))
-        log('Micro Recall: {:.2f}'.format(micro_recall_score_rep))
-        log('Micro F1-score: {:.2f}\n'.format(micro_f1_score_rep))
-        log('Macro Precision: {:.2f}'.format(macro_precision_score_rep))
-        log('Macro Recall: {:.2f}'.format(macro_recall_score_rep))
-        log('Macro F1-score: {:.2f}\n'.format(macro_f1_score_rep))
-        log('Weighted Precision: {:.2f}'.format(weighted_precision_score_rep))
-        log('Weighted Recall: {:.2f}'.format(weighted_recall_score_rep))
-        log('Weighted F1-score: {:.2f}'.format(weighted_f1_score_rep))
-        log('\n--------------- Classification Report ---------------\n')
-        log(classification_report_rep)
 
     def run(self, ):
         dfs = self.extract()
@@ -383,6 +325,81 @@ if __name__ == '__main__':
     model_training = ModelTraining(config)
     model_training.run()
     # model_training.upload_config()
+    
+    
+
+#     def save_smaller_reports(self, report, name):
+#         name = name.replace(f'{self.bucket_loc}/', '')
+#         log(f'report path - {name}')
+#         s3 = boto3.client('s3')
+#         bucket_name = self.paths_config["s3_bucket"]
+
+#         buffer = BytesIO()
+#         pickle.dump(report, buffer)
+#         buffer.seek(0)
+#         s3.upload_fileobj(buffer, bucket_name, name)
+            
+#     def generate_reports(self, x, y, clf, dur, dt, texts_subfolder, df=None):
+#         y_p = clf.predict(x)
+        
+#         y_proba = clf.predict_proba(x)
+#         y_proba = pd.DataFrame(y_proba)
+#         y_proba['pred'] = y_p
+#         save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
+
+#         confusion_matrix_rep = pd.DataFrame(confusion_matrix(y, y_p))
+#         save_df_as_csv(confusion_matrix_rep, f'{texts_subfolder}/confusion_matrix_rep_{dur}.csv')
+
+#         accuracy_score_rep = accuracy_score(y, y_p)
+#         self.save_smaller_reports(accuracy_score_rep, name=f'{texts_subfolder}/accuracy_score_rep_{dur}.pkl')
+
+#         balanced_accuracy_score_rep = balanced_accuracy_score(y, y_p)
+#         self.save_smaller_reports(balanced_accuracy_score_rep, name=f'{texts_subfolder}/balanced_accuracy_score_rep_{dur}.pkl')
+
+#         micro_precision_score_rep = precision_score(y, y_p, average='micro')
+#         self.save_smaller_reports(micro_precision_score_rep, name=f'{texts_subfolder}/micro_precision_score_rep_{dur}.pkl')
+
+#         micro_recall_score_rep = recall_score(y, y_p, average='micro')
+#         self.save_smaller_reports(micro_recall_score_rep, name=f'{texts_subfolder}/micro_recall_score_rep_{dur}.pkl')
+
+#         micro_f1_score_rep = f1_score(y, y_p, average='micro')
+#         self.save_smaller_reports(micro_f1_score_rep, name=f'{texts_subfolder}/micro_f1_score_rep_{dur}.pkl')
+
+#         macro_precision_score_rep = precision_score(y, y_p, average='macro')
+#         self.save_smaller_reports(macro_precision_score_rep, name=f'{texts_subfolder}/macro_precision_score_rep_{dur}.pkl')
+
+#         macro_recall_score_rep = recall_score(y, y_p, average='macro')
+#         self.save_smaller_reports(macro_recall_score_rep, name=f'{texts_subfolder}/macro_recall_score_rep_{dur}.pkl')
+
+#         macro_f1_score_rep = f1_score(y, y_p, average='macro')
+#         self.save_smaller_reports(macro_f1_score_rep, name=f'{texts_subfolder}/macro_f1_score_rep_{dur}.pkl')
+
+#         weighted_precision_score_rep = precision_score(y, y_p, average='weighted')
+#         self.save_smaller_reports(weighted_precision_score_rep, name=f'{texts_subfolder}/weighted_precision_score_rep_{dur}.pkl')
+
+#         weighted_recall_score_rep = recall_score(y, y_p, average='weighted')
+#         self.save_smaller_reports(weighted_recall_score_rep, name=f'{texts_subfolder}/weighted_recall_score_rep_{dur}.pkl')
+
+#         weighted_f1_score_rep = f1_score(y, y_p, average='weighted')
+#         self.save_smaller_reports(weighted_f1_score_rep, name=f'{texts_subfolder}/weighted_f1_score_rep_{dur}.pkl')
+
+#         classification_report_rep = pd.DataFrame(classification_report(y, y_p, output_dict=True))
+#         save_df_as_csv(classification_report_rep, f'{texts_subfolder}/classification_report_{dur}.csv')
+
+#         log('\n-------------------- Key Metrics --------------------')
+#         log('\nAccuracy: {:.2f}'.format(accuracy_score_rep))
+#         log('Balanced Accuracy: {:.2f}\n'.format(balanced_accuracy_score_rep))
+#         log('Micro Precision: {:.2f}'.format(micro_precision_score_rep))
+#         log('Micro Recall: {:.2f}'.format(micro_recall_score_rep))
+#         log('Micro F1-score: {:.2f}\n'.format(micro_f1_score_rep))
+#         log('Macro Precision: {:.2f}'.format(macro_precision_score_rep))
+#         log('Macro Recall: {:.2f}'.format(macro_recall_score_rep))
+#         log('Macro F1-score: {:.2f}\n'.format(macro_f1_score_rep))
+#         log('Weighted Precision: {:.2f}'.format(weighted_precision_score_rep))
+#         log('Weighted Recall: {:.2f}'.format(weighted_recall_score_rep))
+#         log('Weighted F1-score: {:.2f}'.format(weighted_f1_score_rep))
+#         log('\n--------------- Classification Report ---------------\n')
+#         log(classification_report_rep)
 
 
 

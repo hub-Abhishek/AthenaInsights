@@ -63,11 +63,13 @@ image_results_dir = f'{directory}/{date_selected}/images'
 other_results_dir = f'{directory}/{date_selected}/texts'
 
 # Load probabilities and dependent variables
-y_proba = pd.read_csv(f'{other_results_dir}/y_proba_full.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).drop(columns='Unnamed: 0').rename(columns={'0': 'A', '1': 'B', '2': 'C'})
-dependent_var = pd.read_parquet(f'{base_dir}/dependent_var.parquet').reset_index()
-dependent_var = dependent_var[dependent_var.us_eastern_timestamp.dt.date>=pd.to_datetime(date_selected).date()].reset_index(drop=True)
-results = pd.concat([dependent_var, y_proba], axis=1)
-next_day_results = results[results.us_eastern_timestamp.dt.date==pd.to_datetime(date_selected).date()]
+y_proba_full = pd.read_csv(f'{other_results_dir}/y_proba_full.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+y_proba_10_day = pd.read_csv(f'{other_results_dir}/y_proba_10_day.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+y_proba_1_day = pd.read_csv(f'{other_results_dir}/y_proba_1_day.csv', dtype={'0': 'float64', '1': 'float64', '2': 'float64'}).rename(columns={'0': 'A', '1': 'B', '2': 'C'})
+dependent_var = pd.read_parquet(f'{directory}/dependent_var.parquet').reset_index()
+# dependent_var = dependent_var[dependent_var.us_eastern_timestamp.dt.date>=pd.to_datetime(date_selected).date()].reset_index(drop=True)
+# results = pd.concat([dependent_var, y_proba], axis=1)
+# next_day_results = results[results.us_eastern_timestamp.dt.date==pd.to_datetime(date_selected).date()]
 
 # Display images
 with st.expander("Model performance plots"):
@@ -80,19 +82,17 @@ with st.expander("Model performance plots"):
 
 ##################################################################################################
 
-
-# Apply the function to each row and create a new column
-# df['True_Column'] = df.apply(find_true_column, axis=1)
-
 # Display plots
 with st.expander("Predictions vs reality"):
     # st.write('Spy Plots')
-    # st.write(results.tail())
-    next_day_results['pred_category'] = next_day_results.pred.map({0:'A', 1: 'B', 2: 'C'})
+    st.write(y_proba_1_day.tail())
+    y_proba_1_day['pred_category'] = y_proba_1_day.pred.map({0:'A', 1: 'B', 2: 'C'})
     # next_day_results['pred_after_confidence'] = np.where(next_day_results.A>=slider, 'A')
-    next_day_results['pred_category_after_confidence'] = (next_day_results[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
-    plot_categorization(next_day_results, date_selected, 'close', 'pred_category', st)
-    plot_categorization(next_day_results, date_selected, 'close', 'pred_category_after_confidence', st)
+    y_proba_1_day['pred_category_after_confidence'] = (y_proba_1_day[['A', 'B', 'C']]>slider).apply(find_true_column, axis=1)
+    st.write(dependent_var.head())
+    # st.write(y_proba_1_day.shape, dependent_var[(dependent_var.us_eastern_timestamp.dt.date==pd.to_datetime(date_selected).date())&(dependent_var.mar)].shape)
+    # plot_categorization(y_proba_1_day, date_selected, 'close', 'pred_category', st)
+    # plot_categorization(y_proba_1_day, date_selected, 'close', 'pred_category_after_confidence', st)
     # st.write(next_day_results[next_day_results.pred_category!='C'])
 
 # Display classification reports, confusion matrices

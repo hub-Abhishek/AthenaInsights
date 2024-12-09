@@ -74,7 +74,7 @@ model:
     model_selection: xgboost
     
 modeling:
-    start_date: '2024-11-26'
-    end_date: '2024-12-06'
-    train_on_market_open: True
-    predict_on_market_open: True
+    start_date: '2024-11-27'
+    end_date: '2024-12-05'
+    train_on_market_open_only: False
+    predict_on_market_open_only: True

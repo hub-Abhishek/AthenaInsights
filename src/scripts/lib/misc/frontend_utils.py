@@ -7,6 +7,7 @@ from misc.utils import read_df, load_config, log
 
 def download_dir(prefix, local, bucket_name, client):
     paginator = client.get_paginator('list_objects_v2')
+    log(f'prefix - {prefix}')
     for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
         for obj in page.get('Contents', []):
             file_path = obj['Key']
@@ -30,22 +31,24 @@ def list_subfolders(bucket_name, prefix, client):
 def refresh_target():
     config = load_config()
     paths_config = config['paths_config']
-    # path = f"s3://{paths_config['s3_bucket']}/{paths_config['base_folder']}/{paths_config['data_folder']}/{paths_config['data_prep_folder']}/stock_bars_1min.parquet"
-    path = 's3://sisyphus-general-bucket/AthenaInsights/latest_data/dependent_variable/stock_bars_1min_base_avg.parquet'
+    path = f"s3://{paths_config['s3_bucket']}/{paths_config['base_folder']}/{paths_config['data_folder']}/{config['technical_yaml']['common']['model_name']}/dependent_variable/stock_bars_1min_base_avg.parquet"
     df = read_df(path)
-    df.to_parquet('results/model_data/dependent_var.parquet')
+    df.to_parquet(f'results/model_data/{config["technical_yaml"]["common"]["model_name"]}/dependent_var.parquet')
     log('downloaded dependent_var data')
 
 def refresh_model_results_data():
 
+    bucket_name = 'sisyphus-general-bucket'
+    prefix = 'AthenaInsights/latest_data'
+    local_directory = 'results'
+    results_file_path = 'results/models.txt'
+    forbidden_subdirectories = ['csv', 'parquet']
+
     session = boto3.Session()
     s3 = session.client('s3')
-    bucket_name = 'sisyphus-general-bucket'
-    prefix = 'AthenaInsights/latest_data/model/results/'
-    local_directory = 'results'
-
-    subfolder_names = list_subfolders(bucket_name, prefix, s3)
-    results_file_path = 'results/models.txt'
+    subfolder_names = list_subfolders(bucket_name, prefix + '/', s3)
+    subfolder_names = subfolder_names - set(forbidden_subdirectories)
+    log(f'subfolder_names detected - {subfolder_names}')
     os.makedirs(os.path.dirname(results_file_path), exist_ok=True)
 
     with open(results_file_path, 'w') as file:
@@ -54,7 +57,9 @@ def refresh_model_results_data():
     log('Written models to file')
 
     local_directory = 'results/model_data/'
-    download_dir(prefix, local_directory, bucket_name, s3)
+    for subfolder in subfolder_names:
+        log(f'downloading {subfolder}')
+        download_dir(f'{prefix}/{subfolder}/model/results/', f'{local_directory}/{subfolder}', bucket_name, s3)
 
     refresh_target()
 

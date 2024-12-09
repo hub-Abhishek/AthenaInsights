@@ -12,4 +12,4 @@ st.title("Welcome to Athena Insights!")
 
 st.write("SPY has _N_ fluctuations on a given day. Monitoring these fluctuations can be challenging, and risky. Athena Insights uses ML and AI to monitor these fluctuations for you. Add your number below to recieve sms suggestions on a regular basis, and start your journey into day trading today!")
 
-st.text_input("Contact me at", max_chars=10)
+st.text_input("Add your phone number to recieve suggestions", max_chars=10, disabled=True)
