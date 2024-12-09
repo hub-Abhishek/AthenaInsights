@@ -263,6 +263,10 @@ class ModelTraining(BaseClass):
             y_proba['close_diff_ema_5m'] = x.close_diff_ema_5m
         elif 'close_ema_5m' in x.columns:
             y_proba['close_ema_5m'] = x.close_ema_5m
+        if 'close_diff_sma_5m' in x.columns:
+            y_proba['close_diff_sma_5m'] = x.close_diff_sma_5m
+        elif 'close_sma_5m' in x.columns:
+            y_proba['close_sma_5m'] = x.close_sma_5m
         y_proba.index = y.index
         # import pdb;pdb.set_trace();
         save_df_as_csv(y_proba, f'{texts_subfolder}/y_proba_{dur}.csv')
