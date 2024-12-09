@@ -101,7 +101,7 @@ def plot_categorization(df, date_selected, dependent_field_name, predicted_field
                        s=30 if cat != 'C' else 0)
     axs[0].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
     axs[0].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+    # axs[0].xaxis.set_minor_locator(AutoMinorLocator(n=10))
 
     axs[1].plot(df.us_eastern_timestamp, df[dependent_field_name], label=f'Close Price', color='gray', linewidth=2)
     for cat, color in zip(['A', 'B', 'C'], ['green', 'red', 'gray']):
@@ -111,7 +111,7 @@ def plot_categorization(df, date_selected, dependent_field_name, predicted_field
                        s=20 if cat != 'C' else 0)
     axs[1].grid(axis='x', which='major', linestyle=':', linewidth='0.5', color='gray')
     axs[1].grid(axis='x', which='minor', linestyle=':', linewidth='0.5', color='gray')
-    axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
+    # axs[1].xaxis.set_minor_locator(AutoMinorLocator(n=10))
 
     plt.legend()
     plt.title(f'Price Categorization on {date_selected}')
